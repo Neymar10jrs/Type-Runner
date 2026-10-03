@@ -1,6 +1,7 @@
-import React from 'react';
-import type { PlayerProfile } from '../types/game';
+import React, { useState, useEffect } from 'react';
+import type { PlayerProfile, GameMode } from '../types/game';
 import { CHASERS } from '../engine/chasers';
+import { ApiClient } from '../engine/apiClient';
 import {
   X,
   TrendingUp,
@@ -11,7 +12,9 @@ import {
   Clock,
   Flame,
   Shield,
-  BarChart2
+  BarChart2,
+  Crosshair,
+  BookOpen
 } from 'lucide-react';
 
 interface StatsDashboardProps {
@@ -20,6 +23,16 @@ interface StatsDashboardProps {
 }
 
 export const StatsDashboard: React.FC<StatsDashboardProps> = ({ profile, onClose }) => {
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+
+  useEffect(() => {
+    ApiClient.getAnalytics().then(data => {
+      if (data && data.success) {
+        setAnalyticsData(data);
+      }
+    }).catch(console.error);
+  }, []);
+
   // Extract recent runs for the chart (up to 15)
   const recentRuns = [...profile.recentRuns].reverse().slice(-15);
 
@@ -153,6 +166,55 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ profile, onClose
             <span className="text-xs font-mono text-slate-400">Last 15 Sessions</span>
           </div>
           {renderWpmChart()}
+        </div>
+
+        {/* PER-MODE MISSIONS TELEMETRY */}
+        <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+              <Award className="w-4 h-4 text-emerald-400" /> Mode Mission Telemetry
+            </h3>
+            <span className="text-xs font-mono text-emerald-400 font-semibold">Backend Synced</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { id: 'endless', label: 'Endless Run', icon: <Flame className="w-4 h-4 text-amber-400" /> },
+              { id: 'time_attack', label: 'Time Attack', icon: <Clock className="w-4 h-4 text-emerald-400" /> },
+              { id: 'creature_hunt', label: 'Creature Hunt', icon: <Crosshair className="w-4 h-4 text-purple-400" /> },
+              { id: 'disaster_run', label: 'Disaster Run', icon: <Shield className="w-4 h-4 text-blue-400" /> },
+              { id: 'practice', label: 'Practice Mode', icon: <BookOpen className="w-4 h-4 text-cyan-400" /> },
+              { id: 'challenge', label: 'Challenge Gauntlets', icon: <Award className="w-4 h-4 text-amber-400" /> }
+            ].map(m => {
+              const modeStats = analyticsData?.perMode?.[m.id] || {
+                runsCount: profile.recentRuns.filter(r => r.mode === m.id).length,
+                avgWpm: 0,
+                maxWpm: 0,
+                avgAccuracy: 0,
+                totalDistance: 0,
+                escapesCount: profile.recentRuns.filter(r => r.mode === m.id && r.won).length
+              };
+
+              return (
+                <div key={m.id} className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/80">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-xs text-slate-200 flex items-center gap-1.5">
+                      {m.icon} {m.label}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                      {modeStats.runsCount} {modeStats.runsCount === 1 ? 'run' : 'runs'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 mt-2">
+                    <div>Avg: <strong className="text-amber-300">{modeStats.avgWpm}</strong> WPM</div>
+                    <div>Peak: <strong className="text-cyan-300">{modeStats.maxWpm}</strong> WPM</div>
+                    <div>Dist: <strong className="text-slate-200">{Math.round(modeStats.totalDistance)}</strong>m</div>
+                    <div>Escapes: <strong className="text-emerald-400">{modeStats.escapesCount}</strong></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* PURSUERS ENCOUNTERED & ESCAPE LOG */}

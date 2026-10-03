@@ -18,6 +18,7 @@ import { difficultyEngine } from './engine/difficultyEngine';
 import { sound } from './audio/soundEngine';
 import { StorageManager } from './engine/storage';
 import { GameRenderer } from './renderer/GameRenderer';
+import { ApiClient } from './engine/apiClient';
 import { StartScreen } from './components/StartScreen';
 import { GameHUD } from './components/GameHUD';
 import { GameOverModal } from './components/GameOverModal';
@@ -26,6 +27,7 @@ import { CustomizationModal } from './components/CustomizationModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ChallengesModal } from './components/ChallengesModal';
 import { PauseModal } from './components/PauseModal';
+import { Zap, AlertTriangle } from 'lucide-react';
 
 type AppScreen = 'start' | 'playing' | 'gameover';
 
@@ -39,8 +41,13 @@ export function App() {
   const [profile, setProfile] = useState<PlayerProfile>(() => StorageManager.getProfile());
   const [settings, setSettings] = useState<GameSettings>(() => StorageManager.getSettings());
 
+  // Backend Sync Status
+  const [apiOnline, setApiOnline] = useState<boolean>(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+
   // Screen & Modals
   const [screen, setScreen] = useState<AppScreen>('start');
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showLocker, setShowLocker] = useState<boolean>(false);
   const [showStats, setShowStats] = useState<boolean>(false);
@@ -97,6 +104,8 @@ export function App() {
   currentTextRef.current = currentText;
   const typedTextRef = useRef(typedText);
   typedTextRef.current = typedText;
+  const countdownRef = useRef(countdown);
+  countdownRef.current = countdown;
   const audioStartedRef = useRef<boolean>(false);
 
   // Initialize Canvas Renderer on mount
@@ -123,6 +132,42 @@ export function App() {
     );
     sound.setKeyboardType(settings.keyboardSoundType);
   }, [settings]);
+
+  // Sync profile and settings with backend server on mount
+  useEffect(() => {
+    ApiClient.getProfile().then(p => {
+      if (p) setProfile(p);
+    }).catch(console.error);
+
+    ApiClient.getSettings().then(s => {
+      if (s) setSettings(s);
+    }).catch(console.error);
+
+    const unsubscribe = ApiClient.subscribe((online, err) => {
+      setApiOnline(online);
+      setApiError(err);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Pre-game countdown tick effect (3 -> 2 -> 1 -> RUN! -> null)
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(prev => (prev !== null && prev > 1 ? prev - 1 : 0));
+        sound.playBlip();
+      }, 700);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      sound.playJump();
+      const timer = setTimeout(() => {
+        setCountdown(null);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   /**
    * Spawns a new dynamic obstacle ahead of the player
@@ -237,6 +282,8 @@ export function App() {
       setDifficulty('beginner');
       setIsPaused(false);
       setScreen('playing');
+      setCountdown(3);
+      sound.playBlip();
     },
     [spawnObstacle]
   );
@@ -253,7 +300,7 @@ export function App() {
       const baseXP = Math.floor(currentStats.distanceMeters * 0.4) + (won ? 300 : 80);
 
       const record: RunRecord = {
-        id: Math.random().toString(),
+        id: Math.random().toString(36).substring(2, 9),
         timestamp: Date.now(),
         mode,
         chaserId: chaser.id,
@@ -270,11 +317,21 @@ export function App() {
         xpEarned: baseXP
       };
 
-      const { profile: updatedProfile, isNewBest } = StorageManager.recordRun(record);
-      setProfile(updatedProfile);
       setLastRunRecord(record);
-      setIsNewPersonalBest(isNewBest);
       setScreen('gameover');
+
+      // Persist run via ApiClient and update profile state
+      ApiClient.recordRun(record)
+        .then(({ profile: updatedProfile, isNewBest }) => {
+          setProfile(updatedProfile);
+          setIsNewPersonalBest(isNewBest);
+        })
+        .catch(err => {
+          console.error('ApiClient recordRun error:', err);
+          const { profile: updatedProfile, isNewBest } = StorageManager.recordRun(record);
+          setProfile(updatedProfile);
+          setIsNewPersonalBest(isNewBest);
+        });
     },
     [chaser, mode]
   );
@@ -285,6 +342,11 @@ export function App() {
   const handleKeystroke = useCallback(
     (char: string) => {
       if (screen !== 'playing' || isPaused) return;
+
+      // If in countdown, dismiss countdown immediately so typing flows without delay
+      if (countdownRef.current !== null) {
+        setCountdown(null);
+      }
 
       // Ensure audio starts on very first key press
       if (!audioStartedRef.current) {
@@ -504,6 +566,27 @@ export function App() {
       const curStats = { ...statsRef.current };
 
       if (isPlaying) {
+        if (countdownRef.current !== null) {
+          if (rendererRef.current) {
+            rendererRef.current.render(
+              dt,
+              0,
+              'idle',
+              chaser,
+              environment,
+              obstaclesRef.current,
+              curStats.chaserDistanceMeters,
+              profile.equippedSkin,
+              profile.equippedTrail,
+              curStats.currentStreak,
+              settings.reducedMotion,
+              mode
+            );
+          }
+          animationFrameId = requestAnimationFrame(loop);
+          return;
+        }
+
         curStats.survivalSeconds += dt;
 
         // Check Time Attack mode timer (90s)
@@ -825,6 +908,33 @@ export function App() {
           }}
           onClose={() => setShowChallenges(false)}
         />
+      )}
+
+      {/* PRE-GAME 3-2-1 COUNTDOWN OVERLAY */}
+      {countdown !== null && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/45 backdrop-blur-[2px] select-none pointer-events-none animate-fadeIn">
+          <div className="text-center p-8 rounded-3xl bg-slate-950/85 border border-cyan-500/40 shadow-2xl backdrop-blur-md">
+            <div className="text-xs uppercase font-mono tracking-widest text-cyan-400 mb-2 font-bold flex items-center justify-center gap-2">
+              <Zap className="w-4 h-4 animate-pulse" /> {mode.replace('_', ' ').toUpperCase()} • GET READY
+            </div>
+            <div className="text-7xl sm:text-9xl font-black font-heading text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-cyan-400 drop-shadow-[0_0_40px_rgba(34,211,238,0.85)] animate-pulse">
+              {countdown === 0 ? 'RUN!' : countdown}
+            </div>
+            <div className="text-xs sm:text-sm font-mono text-slate-300 mt-4 drop-shadow">
+              {mode === 'practice'
+                ? 'Zen Typing Mode • Zero Pressure • Type freely'
+                : `Pursuer: ${chaser.name} (${chaser.baseSpeed} m/s) • Typing powers your speed`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BACKEND OFFLINE / FALLBACK NOTICE */}
+      {!apiOnline && (
+        <div className="fixed bottom-3 right-3 z-50 bg-amber-950/90 border border-amber-500/60 text-amber-200 text-xs px-3.5 py-2 rounded-xl shadow-xl font-mono flex items-center gap-2 backdrop-blur-md animate-fadeIn">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>Offline Mode: Data saved locally. Syncs once server is active.</span>
+        </div>
       )}
     </div>
   );

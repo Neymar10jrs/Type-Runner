@@ -15,7 +15,8 @@ import {
   Flame,
   Award,
   Sparkles,
-  Compass
+  Compass,
+  X
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -41,6 +42,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 }) => {
   const [selectedMode, setSelectedMode] = useState<GameMode>('endless');
   const [selectedChaserId, setSelectedChaserId] = useState<string>('dragon');
+  const [showBeastPicker, setShowBeastPicker] = useState<boolean>(false);
+  const [showDisasterPicker, setShowDisasterPicker] = useState<boolean>(false);
 
   // Allow pressing Enter on the start screen to immediately launch into the chosen mode
   useEffect(() => {
@@ -194,34 +197,67 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 key={m.id}
                 onClick={() => {
                   setSelectedMode(m.id);
-                  if (m.id === 'creature_hunt') {
+                  if (m.id === 'endless') {
+                    onStartGame('endless');
+                  } else if (m.id === 'time_attack') {
+                    onStartGame('time_attack');
+                  } else if (m.id === 'practice') {
+                    onStartGame('practice');
+                  } else if (m.id === 'creature_hunt') {
                     if (CHASERS[selectedChaserId as keyof typeof CHASERS]?.category !== 'creature') {
                       setSelectedChaserId('dragon');
                     }
+                    setShowBeastPicker(true);
                   } else if (m.id === 'disaster_run') {
                     if (CHASERS[selectedChaserId as keyof typeof CHASERS]?.category !== 'disaster') {
                       setSelectedChaserId('tornado');
                     }
+                    setShowDisasterPicker(true);
                   }
                 }}
-                className={`cursor-pointer p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden backdrop-blur-md ${
+                className={`cursor-pointer p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden backdrop-blur-md flex flex-col justify-between group ${
                   isSelected
                     ? 'bg-slate-900/90 border-cyan-400 shadow-xl shadow-cyan-500/20 scale-[1.02]'
                     : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/60'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 rounded-xl bg-slate-800/70">{m.icon}</div>
-                  <span
-                    className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                      isSelected ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    {m.tag}
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="p-2 rounded-xl bg-slate-800/70">{m.icon}</div>
+                    <span
+                      className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                        isSelected ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+                      }`}
+                    >
+                      {m.tag}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-100 mb-0.5">{m.title}</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">{m.subtitle}</p>
                 </div>
-                <h3 className="text-base font-bold text-slate-100 mb-0.5">{m.title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{m.subtitle}</p>
+
+                <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMode(m.id);
+                      if (m.id === 'endless') onStartGame('endless');
+                      else if (m.id === 'time_attack') onStartGame('time_attack');
+                      else if (m.id === 'practice') onStartGame('practice');
+                      else if (m.id === 'creature_hunt') setShowBeastPicker(true);
+                      else if (m.id === 'disaster_run') setShowDisasterPicker(true);
+                    }}
+                    className="text-xs font-bold text-cyan-400 group-hover:text-cyan-300 flex items-center gap-1 transition"
+                  >
+                    {m.id === 'endless' && 'Play Now'}
+                    {m.id === 'time_attack' && 'Start 90s Sprint'}
+                    {m.id === 'practice' && 'Start Practice'}
+                    {m.id === 'creature_hunt' && 'Select Beast & Hunt'}
+                    {m.id === 'disaster_run' && 'Select Hazard & Run'}
+                    <Play className="w-3 h-3 fill-current ml-0.5" />
+                  </button>
+                  <span className="text-[10px] uppercase font-mono text-slate-500">Instant Start</span>
+                </div>
               </div>
             );
           })}
@@ -229,7 +265,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
           {/* CHALLENGES SPECIAL CARD */}
           <div
             onClick={onOpenChallenges}
-            className="cursor-pointer p-4 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-950/30 to-slate-950/80 hover:border-amber-400 transition-all duration-200 relative overflow-hidden backdrop-blur-md flex flex-col justify-between"
+            className="cursor-pointer p-4 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-950/30 to-slate-950/80 hover:border-amber-400 transition-all duration-200 relative overflow-hidden backdrop-blur-md flex flex-col justify-between group"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -245,8 +281,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 Curated objective trials with coin & XP bounties.
               </p>
             </div>
-            <div className="flex items-center text-xs font-bold text-amber-400 mt-2">
-              Launch Missions <Play className="w-3.5 h-3.5 ml-1 fill-current" />
+            <div className="mt-3 pt-2.5 border-t border-amber-500/30 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-400 group-hover:text-amber-300 flex items-center gap-1 transition">
+                Launch Missions <Play className="w-3 h-3 fill-current ml-0.5" />
+              </span>
+              <span className="text-[10px] uppercase font-mono text-amber-500/70">Trials</span>
             </div>
           </div>
         </div>
@@ -275,14 +314,21 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                   return (
                     <button
                       key={c.id}
-                      onClick={() => setSelectedChaserId(c.id)}
-                      className={`p-2.5 rounded-xl border text-left transition ${
+                      onClick={() => {
+                        setSelectedChaserId(c.id);
+                        onStartGame(selectedMode, c.id);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition group ${
                         isCur
                           ? 'bg-cyan-950/80 border-cyan-400 text-white shadow-md shadow-cyan-500/20'
                           : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
                       }`}
+                      title={`Start run against ${c.name}`}
                     >
-                      <div className="font-bold text-xs truncate">{c.name}</div>
+                      <div className="font-bold text-xs truncate flex items-center justify-between">
+                        <span>{c.name}</span>
+                        <Play className="w-2.5 h-2.5 text-cyan-400 fill-current opacity-70 group-hover:opacity-100 transition" />
+                      </div>
                       <div className="text-[10px] text-slate-500 truncate">{c.title}</div>
                     </button>
                   );
@@ -340,6 +386,138 @@ export const StartScreen: React.FC<StartScreenProps> = ({
           <strong className="text-purple-400">{profile.bestScore.toLocaleString()}</strong>
         </span>
       </footer>
+
+      {/* MYTHICAL BEAST SELECTION MODAL */}
+      {showBeastPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md select-none animate-fadeIn">
+          <div className="w-full max-w-4xl bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-purple-950/80 border border-purple-700/60 rounded-2xl text-purple-400">
+                  <Crosshair className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-white font-heading">
+                    CHOOSE YOUR ALPHA PREDATOR
+                  </h2>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Select a mythical beast to begin your hunt. Selecting any beast starts the hunt immediately!
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBeastPicker(false)}
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+              {chaserList.filter(c => c.category === 'creature').map(beast => (
+                <div
+                  key={beast.id}
+                  onClick={() => {
+                    setSelectedChaserId(beast.id);
+                    setSelectedMode('creature_hunt');
+                    setShowBeastPicker(false);
+                    onStartGame('creature_hunt', beast.id);
+                  }}
+                  className="cursor-pointer p-4 rounded-2xl border border-slate-800 bg-slate-950/70 hover:border-purple-400 hover:bg-slate-900 transition flex flex-col justify-between group shadow-lg"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs font-bold text-purple-400 px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-800/60">
+                        {beast.baseSpeed} m/s
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">
+                        {beast.environment.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-white group-hover:text-purple-300 transition mb-0.5">
+                      {beast.name}
+                    </h3>
+                    <div className="text-xs text-purple-400 font-medium mb-1.5">{beast.title}</div>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-2">{beast.threatDescription}</p>
+                    <div className="text-[11px] italic text-slate-500">"{beast.roarText}"</div>
+                  </div>
+                  <button
+                    className="mt-3 w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-purple-600/30"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" /> HUNT THIS BEAST
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DISASTER CATACLYSM SELECTION MODAL */}
+      {showDisasterPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md select-none animate-fadeIn">
+          <div className="w-full max-w-4xl bg-slate-900 border border-blue-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-950/80 border border-blue-700/60 rounded-2xl text-blue-400">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-white font-heading">
+                    CHOOSE YOUR CATACLYSM HAZARD
+                  </h2>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Select a natural cataclysm to outrun. Selecting any disaster starts the run immediately!
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDisasterPicker(false)}
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+              {chaserList.filter(c => c.category === 'disaster').map(hazard => (
+                <div
+                  key={hazard.id}
+                  onClick={() => {
+                    setSelectedChaserId(hazard.id);
+                    setSelectedMode('disaster_run');
+                    setShowDisasterPicker(false);
+                    onStartGame('disaster_run', hazard.id);
+                  }}
+                  className="cursor-pointer p-4 rounded-2xl border border-slate-800 bg-slate-950/70 hover:border-blue-400 hover:bg-slate-900 transition flex flex-col justify-between group shadow-lg"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs font-bold text-blue-400 px-2 py-0.5 rounded-full bg-blue-950/80 border border-blue-800/60">
+                        {hazard.baseSpeed} m/s
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">
+                        {hazard.environment.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold text-white group-hover:text-blue-300 transition mb-0.5">
+                      {hazard.name}
+                    </h3>
+                    <div className="text-xs text-blue-400 font-medium mb-1.5">{hazard.title}</div>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-2">{hazard.threatDescription}</p>
+                    <div className="text-[11px] italic text-slate-500">"{hazard.roarText}"</div>
+                  </div>
+                  <button
+                    className="mt-3 w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-blue-600/30"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" /> EVACUATE HAZARD
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { GameSettings } from '../types/game';
 import { StorageManager } from '../engine/storage';
+import { ApiClient } from '../engine/apiClient';
 import { sound } from '../audio/soundEngine';
 import {
   X,
@@ -27,6 +28,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleChange = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
     const updated = { ...settings, [key]: value };
     StorageManager.saveSettings(updated);
+    ApiClient.saveSettings(updated).catch(console.error);
     onUpdateSettings(updated);
 
     // Apply audio volumes directly to sound engine

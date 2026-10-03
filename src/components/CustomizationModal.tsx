@@ -6,6 +6,7 @@ import {
   TITLES_CATALOG,
   StorageManager
 } from '../engine/storage';
+import { ApiClient } from '../engine/apiClient';
 import { X, Shirt, Sparkles, Check, Lock, Award, Flame } from 'lucide-react';
 
 interface CustomizationModalProps {
@@ -24,6 +25,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = ({
   const handleEquipSkin = (skinId: string) => {
     const updated = { ...profile, equippedSkin: skinId };
     StorageManager.saveProfile(updated);
+    ApiClient.saveProfile(updated).catch(console.error);
     onUpdateProfile(updated);
   };
 
@@ -36,12 +38,14 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = ({
       equippedSkin: skin.id
     };
     StorageManager.saveProfile(updated);
+    ApiClient.saveProfile(updated).catch(console.error);
     onUpdateProfile(updated);
   };
 
   const handleEquipTrail = (trailId: string) => {
     const updated = { ...profile, equippedTrail: trailId };
     StorageManager.saveProfile(updated);
+    ApiClient.saveProfile(updated).catch(console.error);
     onUpdateProfile(updated);
   };
 
@@ -54,12 +58,14 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = ({
       equippedTrail: trail.id
     };
     StorageManager.saveProfile(updated);
+    ApiClient.saveProfile(updated).catch(console.error);
     onUpdateProfile(updated);
   };
 
   const handleEquipTitle = (titleText: string) => {
     const updated = { ...profile, equippedTitle: titleText };
     StorageManager.saveProfile(updated);
+    ApiClient.saveProfile(updated).catch(console.error);
     onUpdateProfile(updated);
   };
 

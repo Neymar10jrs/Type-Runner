@@ -315,6 +315,28 @@ class SoundEngine {
     osc.stop(t + 0.36);
   }
 
+  // --- COUNTDOWN BLIP ---
+  public playBlip(freq: number = 440) {
+    if (!this.ctx || !this.sfxGain) return;
+    this.resume();
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(t);
+    osc.stop(t + 0.11);
+  }
+
   // --- CHASER ROAR / WARNING ---
   public playRoar(category: 'creature' | 'disaster') {
     if (!this.ctx || !this.sfxGain) return;
