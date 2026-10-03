@@ -4,7 +4,8 @@ import type {
   Obstacle,
   PlayerActionState,
   CharacterSkin,
-  RunningTrail
+  RunningTrail,
+  GameMode
 } from '../types/game';
 import { ENVIRONMENTS } from '../engine/chasers';
 import { SKINS_CATALOG, TRAILS_CATALOG } from '../engine/storage';
@@ -152,7 +153,8 @@ export class GameRenderer {
     equippedSkinId: string,
     equippedTrailId: string,
     streak: number,
-    reducedMotion: boolean = false
+    reducedMotion: boolean = false,
+    mode: GameMode = 'endless'
   ) {
     const ctx = this.ctx;
     const w = this.width;
@@ -219,10 +221,11 @@ export class GameRenderer {
     this.renderObstacles(ctx, obstacles, runnerScreenX, groundY, w);
 
     // 8. CHASER MONSTER / DISASTER
-    // Chaser is rendered behind the runner based on chaserDistanceMeters
-    // 50m distance translates to ~260px behind player
-    const chaserScreenX = runnerScreenX - Math.max(70, Math.min(450, chaserDistanceMeters * 6.5));
-    this.renderChaser(ctx, chaser, env, chaserScreenX, groundY, chaserDistanceMeters, dt);
+    // In practice mode, zero chaser pressure - no pursuer is rendered
+    if (mode !== 'practice') {
+      const chaserScreenX = runnerScreenX - Math.max(70, Math.min(450, chaserDistanceMeters * 6.5));
+      this.renderChaser(ctx, chaser, env, chaserScreenX, groundY, chaserDistanceMeters, dt);
+    }
 
     // 9. RUNNING TRAILS & PARTICLES
     const skin = SKINS_CATALOG.find(s => s.id === equippedSkinId) || SKINS_CATALOG[0];
@@ -240,8 +243,8 @@ export class GameRenderer {
       this.renderSpeedLines(ctx, runnerSpeed, w, h);
     }
 
-    // 13. DANGER VIGNETTE (if chaser < 25m)
-    if (chaserDistanceMeters < 30) {
+    // 13. DANGER VIGNETTE (if chaser < 30m, disabled in practice mode)
+    if (mode !== 'practice' && chaserDistanceMeters < 30) {
       this.renderDangerVignette(ctx, chaserDistanceMeters, w, h);
     }
 

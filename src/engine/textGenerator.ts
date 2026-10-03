@@ -1,4 +1,4 @@
-import type { DifficultyLevel, ChaserId } from '../types/game';
+import type { DifficultyLevel, ChaserId, GameMode } from '../types/game';
 
 const BEGINNER_SENTENCES = [
   'The ancient forest was silent before the storm arrived.',
@@ -126,5 +126,55 @@ export class TextGenerator {
           'Run as fast as you can to survive the endless pursuit.'
         ];
     }
+  }
+
+  /**
+   * Generates opening sentence suited to the game mode and pursuer
+   */
+  public static getModeInitialSentence(mode: GameMode, chaserId?: string): string {
+    if (mode === 'practice') {
+      return 'Take a deep breath and find your natural typing rhythm. Smoothness creates speed.';
+    }
+    if (mode === 'time_attack') {
+      return 'Sprint forward at maximum speed and maintain flawless accuracy across every word.';
+    }
+    if (mode === 'creature_hunt') {
+      switch (chaserId) {
+        case 'dragon':
+          return 'The skies ignite with sulfur and flame as Ignis the Ancient Drake descends upon the trail.';
+        case 'kraken':
+          return 'Colossal tentacles erupt from stormy tides, shattering the stone arches along the coast.';
+        case 'werewolf':
+          return 'A blood-chilling howl pierces the misty woods as the Bloodfang Behemoth bounds forward.';
+        case 'serpent':
+          return 'Venomous hisses poison the damp shadows as the Jormungandr Serpent coils into the sprint.';
+        case 'shadow_monster':
+          return 'Reality ripples as black void tendrils extend to siphon your hard-earned velocity.';
+        case 'ancient_golem':
+          return 'Ground-shattering footsteps shake the earth as the Ruinic Colossus lumbers behind you.';
+        case 'fire_elemental':
+          return 'A blinding storm of molten plasma and incandescent ash scorches the path ahead.';
+        default:
+          return 'A terrifying beast roars behind you as the desperate sprint for survival begins.';
+      }
+    }
+    if (mode === 'disaster_run') {
+      switch (chaserId) {
+        case 'tornado':
+          return 'Two hundred mph gale winds rip the highway apart as the F5 Hyper-Twister bears down.';
+        case 'tsunami':
+          return 'A hundred-foot wall of roaring black water smashes over the coastal ridge in fury.';
+        case 'volcanic_eruption':
+          return 'The caldera blows skyward with shockwaves of ash as superheated pyroclastic surges approach.';
+        case 'avalanche':
+          return 'The mountain peak collapses in blinding white as a pulverizing wall of ice thunders down.';
+        case 'wildfire':
+          return 'Towering crowns of fire ignite the canopy as gale-force conflagrations sweep the forest.';
+        default:
+          return 'The catastrophic natural cataclysm surges forward—sprint toward emergency evacuation!';
+      }
+    }
+    // Endless
+    return 'The ancient forest was silent before the storm arrived.';
   }
 }

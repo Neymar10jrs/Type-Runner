@@ -49,6 +49,52 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const getModalTitle = () => {
+    if (record.mode === 'time_attack') {
+      return '90s SPRINT COMPLETE!';
+    }
+    if (record.mode === 'practice') {
+      return 'PRACTICE SESSION FINISHED';
+    }
+    if (record.mode === 'creature_hunt') {
+      return record.won ? `${chaser.name.toUpperCase()} OUTRUN!` : `OVERTAKEN BY ${chaser.name.toUpperCase()}`;
+    }
+    if (record.mode === 'disaster_run') {
+      return record.won ? 'CATACLYSM EVACUATED!' : `OVERWHELMED BY ${chaser.name.toUpperCase()}`;
+    }
+    if (record.mode === 'challenge') {
+      return record.won ? 'CHALLENGE ACCOMPLISHED!' : 'TRIAL OBJECTIVE FAILED';
+    }
+    return record.won ? 'RUN COMPLETE — ESCAPED!' : 'OVERTAKEN BY PURSUER';
+  };
+
+  const getModalSubtitle = () => {
+    if (record.mode === 'time_attack') {
+      return `You sprinted ${Math.round(record.distanceMeters)} meters in 90 seconds with an average speed of ${record.wpm} WPM!`;
+    }
+    if (record.mode === 'practice') {
+      return `Great practice session! Logged ${Math.round(record.distanceMeters)} meters with ${Math.round(record.accuracy)}% accuracy.`;
+    }
+    if (record.mode === 'creature_hunt') {
+      return record.won
+        ? `You successfully outpaced ${chaser.name} across ${Math.round(record.distanceMeters)} meters!`
+        : `${chaser.name} closed the distance at ${Math.round(record.distanceMeters)} meters.`;
+    }
+    if (record.mode === 'disaster_run') {
+      return record.won
+        ? `You reached the emergency perimeter bunker at ${Math.round(record.distanceMeters)}m, escaping ${chaser.name}!`
+        : `${chaser.name} engulfed the route at ${Math.round(record.distanceMeters)} meters.`;
+    }
+    if (record.mode === 'challenge') {
+      return record.won
+        ? `Objective fulfilled! Bounties claimed: +${record.coinsEarned} Coins, +${record.xpEarned} XP.`
+        : 'Objective criteria were not fully satisfied. Regroup and try again!';
+    }
+    return record.won
+      ? `You successfully broke away from ${chaser.name} at ${Math.round(record.distanceMeters)} meters!`
+      : `${chaser.name} closed the distance at ${Math.round(record.distanceMeters)} meters.`;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md select-none animate-fadeIn">
       <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
@@ -70,18 +116,12 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           )}
 
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white font-heading">
-            {record.won ? 'RUN COMPLETE — ESCAPED!' : 'OVERTAKEN BY THE PURSUER'}
+            {getModalTitle()}
           </h2>
           <p className="text-slate-400 text-sm mt-1">
-            {record.won ? (
-              <span className="text-emerald-400 font-semibold">
-                You successfully broke away from {chaser.name}!
-              </span>
-            ) : (
-              <span>
-                {chaser.name} closed the distance at {Math.round(record.distanceMeters)} meters.
-              </span>
-            )}
+            <span className={record.won ? 'text-emerald-400 font-semibold' : 'text-slate-300'}>
+              {getModalSubtitle()}
+            </span>
           </p>
         </div>
 

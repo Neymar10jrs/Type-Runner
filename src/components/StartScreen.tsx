@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { GameMode, PlayerProfile, GameSettings } from '../types/game';
 import { CHASERS } from '../engine/chasers';
+import { TextGenerator } from '../engine/textGenerator';
 import {
   Play,
   Crosshair,
@@ -55,6 +56,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
   const chaserList = Object.values(CHASERS);
   const currentChaser = CHASERS[selectedChaserId as keyof typeof CHASERS] || chaserList[0];
+  const previewSentence = TextGenerator.getModeInitialSentence(selectedMode, selectedChaserId);
 
   const modes: { id: GameMode; title: string; subtitle: string; icon: React.ReactNode; tag: string }[] = [
     {
@@ -106,7 +108,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       case 'time_attack':
         return 'START 90s TIME ATTACK';
       case 'practice':
-        return 'ENTER PRACTICE MODE (ZEN)';
+        return 'ENTER ZEN PRACTICE (NO CHASER)';
       default:
         return 'START RUN';
     }
@@ -190,7 +192,18 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             return (
               <div
                 key={m.id}
-                onClick={() => setSelectedMode(m.id)}
+                onClick={() => {
+                  setSelectedMode(m.id);
+                  if (m.id === 'creature_hunt') {
+                    if (CHASERS[selectedChaserId as keyof typeof CHASERS]?.category !== 'creature') {
+                      setSelectedChaserId('dragon');
+                    }
+                  } else if (m.id === 'disaster_run') {
+                    if (CHASERS[selectedChaserId as keyof typeof CHASERS]?.category !== 'disaster') {
+                      setSelectedChaserId('tornado');
+                    }
+                  }
+                }}
                 className={`cursor-pointer p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden backdrop-blur-md ${
                   isSelected
                     ? 'bg-slate-900/90 border-cyan-400 shadow-xl shadow-cyan-500/20 scale-[1.02]'
@@ -298,9 +311,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
           <div className="font-mono text-xl sm:text-2xl tracking-wide leading-relaxed text-white font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
             <span className="border-b-4 border-cyan-400 bg-cyan-950/60 px-1 rounded animate-pulse shadow-[0_0_12px_rgba(56,189,248,0.9)]">
-              {initialSentence.slice(0, 1)}
+              {previewSentence.slice(0, 1)}
             </span>
-            <span className="text-slate-200">{initialSentence.slice(1)}</span>
+            <span className="text-slate-200">{previewSentence.slice(1)}</span>
           </div>
         </div>
 

@@ -167,17 +167,29 @@ export function App() {
       let selectedChaser: ChaserConfig;
       if (challenge) {
         selectedChaser = CHASERS[challenge.chaserId] || CHASERS.dragon;
-      } else if (chosenChaserId && CHASERS[chosenChaserId as keyof typeof CHASERS]) {
-        selectedChaser = CHASERS[chosenChaserId as keyof typeof CHASERS];
-      } else if (chosenMode === 'disaster_run') {
-        selectedChaser = getRandomChaser(undefined, 'disaster');
       } else if (chosenMode === 'creature_hunt') {
-        selectedChaser = getRandomChaser(undefined, 'creature');
+        if (chosenChaserId && CHASERS[chosenChaserId as keyof typeof CHASERS]?.category === 'creature') {
+          selectedChaser = CHASERS[chosenChaserId as keyof typeof CHASERS];
+        } else {
+          selectedChaser = getRandomChaser(undefined, 'creature');
+        }
+      } else if (chosenMode === 'disaster_run') {
+        if (chosenChaserId && CHASERS[chosenChaserId as keyof typeof CHASERS]?.category === 'disaster') {
+          selectedChaser = CHASERS[chosenChaserId as keyof typeof CHASERS];
+        } else {
+          selectedChaser = getRandomChaser(undefined, 'disaster');
+        }
+      } else if (chosenMode === 'practice') {
+        selectedChaser = CHASERS.werewolf; // Peaceful forest theme, pursuer hidden
+      } else if (chosenMode === 'time_attack') {
+        selectedChaser = CHASERS.dragon;
       } else {
         selectedChaser = getRandomChaser();
       }
 
-      const selectedEnv = ENVIRONMENTS[selectedChaser.environment] || ENVIRONMENTS.ancient_forest;
+      const selectedEnv = chosenMode === 'practice'
+        ? ENVIRONMENTS.ancient_forest
+        : (ENVIRONMENTS[selectedChaser.environment] || ENVIRONMENTS.ancient_forest);
 
       setChaser(selectedChaser);
       setEnvironment(selectedEnv);
@@ -195,7 +207,7 @@ export function App() {
 
       const initialText = challenge
         ? TextGenerator.getChallengeText(challenge.id)[0]
-        : TextGenerator.getNextChallenge('beginner', selectedChaser.id, 0);
+        : TextGenerator.getModeInitialSentence(chosenMode, selectedChaser.id);
 
       setCurrentText(initialText);
       setTypedText('');
@@ -214,7 +226,7 @@ export function App() {
         bestStreak: 0,
         comboMultiplier: 1.0,
         distanceMeters: 0,
-        chaserDistanceMeters: chosenMode === 'practice' ? 120 : 55,
+        chaserDistanceMeters: chosenMode === 'practice' ? 999 : chosenMode === 'time_attack' ? 70 : 55,
         survivalSeconds: 0,
         score: 0,
         obstaclesCleared: 0,
@@ -500,12 +512,37 @@ export function App() {
           return;
         }
 
+        // Check Creature Hunt victory condition (outrun to 95m lead or reach 800m distance)
+        if (mode === 'creature_hunt' && (curStats.chaserDistanceMeters >= 95 || curStats.distanceMeters >= 800)) {
+          handleGameOver(true);
+          return;
+        }
+
+        // Check Disaster Run victory condition (evacuation bunker reached at 1,000m or safe distance lead)
+        if (mode === 'disaster_run' && (curStats.chaserDistanceMeters >= 95 || curStats.distanceMeters >= 1000)) {
+          handleGameOver(true);
+          return;
+        }
+
         // Check Challenge target distance
         if (
           activeChallenge?.targetDistanceMeters &&
           curStats.distanceMeters >= activeChallenge.targetDistanceMeters
         ) {
-          handleGameOver(true);
+          const metWpm = curStats.wpm >= (activeChallenge.targetWpm || 0);
+          const metAcc = curStats.accuracy >= (activeChallenge.targetAccuracy || 0);
+          handleGameOver(metWpm && metAcc);
+          return;
+        }
+
+        // Check Challenge time limit
+        if (
+          activeChallenge?.timeLimitSeconds &&
+          curStats.survivalSeconds >= activeChallenge.timeLimitSeconds
+        ) {
+          const metWpm = curStats.wpm >= (activeChallenge.targetWpm || 0);
+          const metAcc = curStats.accuracy >= (activeChallenge.targetAccuracy || 0);
+          handleGameOver(metWpm && metAcc);
           return;
         }
 
@@ -537,22 +574,30 @@ export function App() {
 
           const relativeSpeed = speed - effectiveChaserSpeed;
           curStats.chaserDistanceMeters += relativeSpeed * dt;
-          curStats.chaserDistanceMeters = Math.max(0, Math.min(100, curStats.chaserDistanceMeters));
+
+          if (mode === 'time_attack') {
+            // In 90s Time Attack, keep minimum distance at 20m so player completes full sprint test
+            curStats.chaserDistanceMeters = Math.max(20, Math.min(100, curStats.chaserDistanceMeters));
+          } else {
+            curStats.chaserDistanceMeters = Math.max(0, Math.min(100, curStats.chaserDistanceMeters));
+
+            // Caught by chaser?
+            if (curStats.chaserDistanceMeters <= 0) {
+              playerStateRef.current = 'defeat';
+              handleGameOver(false);
+              return;
+            }
+          }
 
           sound.updateChaseDanger(curStats.chaserDistanceMeters);
 
-          // Caught by chaser?
-          if (curStats.chaserDistanceMeters <= 0) {
-            playerStateRef.current = 'defeat';
-            handleGameOver(false);
-            return;
-          }
-
-          // Random chaser roar every 15s
-          chaserRoarTimerRef.current += dt;
-          if (chaserRoarTimerRef.current > 15) {
-            chaserRoarTimerRef.current = 0;
-            sound.playRoar(chaser.category);
+          // Random chaser roar every 15s (only in dangerous pursuit modes)
+          if (mode !== 'time_attack') {
+            chaserRoarTimerRef.current += dt;
+            if (chaserRoarTimerRef.current > 15) {
+              chaserRoarTimerRef.current = 0;
+              sound.playRoar(chaser.category);
+            }
           }
         }
 
@@ -600,7 +645,9 @@ export function App() {
               playerStateRef.current = 'stumbling';
               playerStateTimerRef.current = 0.5;
 
-              curStats.chaserDistanceMeters = Math.max(3, curStats.chaserDistanceMeters - 7.5);
+              if (mode !== 'practice') {
+                curStats.chaserDistanceMeters = Math.max(3, curStats.chaserDistanceMeters - 7.5);
+              }
               sound.playErrorSound();
 
               if (settings.screenShake && !settings.reducedMotion) {
@@ -638,7 +685,8 @@ export function App() {
           profile.equippedSkin,
           profile.equippedTrail,
           curStats.currentStreak,
-          settings.reducedMotion
+          settings.reducedMotion,
+          mode
         );
       }
 
@@ -696,6 +744,7 @@ export function App() {
           currentText={currentText}
           typedText={typedText}
           activeObstacle={activeObstacle}
+          activeChallenge={activeChallenge}
           settings={settings}
           profile={profile}
           isPaused={isPaused}
@@ -707,11 +756,12 @@ export function App() {
           onOpenStats={() => setShowStats(true)}
           onOpenSettings={() => setShowSettings(true)}
           onOpenChallenges={() => setShowChallenges(true)}
-          onResetRun={() => startRun(mode)}
+          onResetRun={() => startRun(mode, chaser.id, activeChallenge || undefined)}
           onOpenModes={() => {
             sound.stopMusic();
             setScreen('start');
           }}
+          onFinishPractice={() => handleGameOver(true)}
         />
       )}
 

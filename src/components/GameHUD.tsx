@@ -6,7 +6,8 @@ import type {
   GameMode,
   Obstacle,
   GameSettings,
-  PlayerProfile
+  PlayerProfile,
+  ChallengeDef
 } from '../types/game';
 import {
   Flame,
@@ -34,6 +35,7 @@ interface GameHUDProps {
   currentText: string;
   typedText: string;
   activeObstacle: Obstacle | null;
+  activeChallenge?: ChallengeDef | null;
   settings: GameSettings;
   profile: PlayerProfile;
   isPaused: boolean;
@@ -47,6 +49,7 @@ interface GameHUDProps {
   onOpenChallenges: () => void;
   onResetRun: () => void;
   onOpenModes: () => void;
+  onFinishPractice?: () => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -57,6 +60,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   currentText,
   typedText,
   activeObstacle,
+  activeChallenge,
   settings,
   profile,
   isPaused,
@@ -69,7 +73,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onOpenSettings,
   onOpenChallenges,
   onResetRun,
-  onOpenModes
+  onOpenModes,
+  onFinishPractice
 }) => {
   const hiddenInputRef = useRef<HTMLInputElement>(null);
 
@@ -320,8 +325,66 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </div>
           </div>
 
-          {/* Center: Chaser Proximity Meter (Docked at top so it doesn't block the running character!) */}
-          {mode !== 'practice' && (
+          {/* Center: Mode-Specific Gauges */}
+          {mode === 'practice' && (
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-cyan-500/40 bg-cyan-950/80 backdrop-blur-md text-cyan-200 shadow-lg">
+              <BookOpen className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold tracking-wide">ZEN PRACTICE • ZERO CHASER PRESSURE</span>
+              {onFinishPractice && (
+                <button
+                  onClick={onFinishPractice}
+                  className="ml-2 px-2.5 py-0.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[11px] font-black tracking-wider transition shadow-sm"
+                  title="Conclude training session & view stats"
+                >
+                  FINISH SESSION
+                </button>
+              )}
+            </div>
+          )}
+
+          {mode === 'time_attack' && (
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-emerald-500/50 bg-emerald-950/80 backdrop-blur-md text-emerald-200 shadow-lg">
+              <Clock className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-300">Sprint Countdown:</span>
+                <span className={`font-mono font-black text-sm ${Math.max(0, 90 - stats.survivalSeconds) <= 15 ? 'text-red-400 animate-bounce' : 'text-emerald-300'}`}>
+                  {formatTime(Math.max(0, 90 - stats.survivalSeconds))}
+                </span>
+              </div>
+              <div className="w-20 sm:w-28 h-2 bg-slate-950/90 rounded-full overflow-hidden border border-emerald-700/60">
+                <div
+                  className="h-full bg-emerald-400 transition-all duration-200 rounded-full"
+                  style={{ width: `${Math.min(100, Math.max(0, ((90 - stats.survivalSeconds) / 90) * 100))}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {activeChallenge && (
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-amber-500/60 bg-amber-950/80 backdrop-blur-md text-amber-200 shadow-lg">
+              <Award className="w-4 h-4 text-amber-400" />
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300">{activeChallenge.title}:</span>
+                {activeChallenge.targetDistanceMeters && (
+                  <span className="font-mono text-xs font-bold text-amber-200">
+                    {Math.min(activeChallenge.targetDistanceMeters, Math.round(stats.distanceMeters))}/{activeChallenge.targetDistanceMeters}m
+                  </span>
+                )}
+                {activeChallenge.timeLimitSeconds && (
+                  <span className="font-mono text-xs font-bold text-amber-200">
+                    {formatTime(Math.max(0, activeChallenge.timeLimitSeconds - stats.survivalSeconds))} left
+                  </span>
+                )}
+                {activeChallenge.zeroMistakesAllowed && (
+                  <span className={`font-mono text-xs font-bold ${stats.mistakes > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {stats.mistakes === 0 ? 'Flawless' : `${stats.mistakes} Misses`}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {mode !== 'practice' && mode !== 'time_attack' && !activeChallenge && (
             <div
               className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border backdrop-blur-md transition-all duration-300 shadow-lg ${
                 isDanger
@@ -334,11 +397,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <ShieldAlert className={`w-4 h-4 ${isDanger ? 'text-red-400 animate-spin' : 'text-slate-400'}`} />
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 hidden sm:inline">
-                  Pursuer: <strong className="text-slate-200">{chaser.name}</strong>
+                  {mode === 'disaster_run' ? 'Cataclysm' : 'Pursuer'}: <strong className="text-slate-200">{chaser.name}</strong>
                 </span>
                 <span className="font-mono font-black text-sm text-cyan-300">
                   {Math.round(stats.chaserDistanceMeters)}m
                 </span>
+                {mode === 'creature_hunt' && (
+                  <span className="text-[10px] text-purple-300 font-mono hidden md:inline">(Outrun to 95m!)</span>
+                )}
+                {mode === 'disaster_run' && (
+                  <span className="text-[10px] text-blue-300 font-mono hidden md:inline">(Reach 1,000m bunker!)</span>
+                )}
               </div>
 
               {/* Progress bar */}
