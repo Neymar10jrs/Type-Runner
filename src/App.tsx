@@ -18,6 +18,7 @@ import { difficultyEngine } from './engine/difficultyEngine';
 import { sound } from './audio/soundEngine';
 import { StorageManager } from './engine/storage';
 import { GameRenderer } from './renderer/GameRenderer';
+import { StartScreen } from './components/StartScreen';
 import { GameHUD } from './components/GameHUD';
 import { GameOverModal } from './components/GameOverModal';
 import { StatsDashboard } from './components/StatsDashboard';
@@ -26,7 +27,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ChallengesModal } from './components/ChallengesModal';
 import { PauseModal } from './components/PauseModal';
 
-type AppScreen = 'playing' | 'gameover';
+type AppScreen = 'start' | 'playing' | 'gameover';
 
 const INITIAL_SENTENCE = 'The ancient forest was silent before the storm arrived.';
 
@@ -39,7 +40,7 @@ export function App() {
   const [settings, setSettings] = useState<GameSettings>(() => StorageManager.getSettings());
 
   // Screen & Modals
-  const [screen, setScreen] = useState<AppScreen>('playing');
+  const [screen, setScreen] = useState<AppScreen>('start');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showLocker, setShowLocker] = useState<boolean>(false);
   const [showStats, setShowStats] = useState<boolean>(false);
@@ -429,6 +430,10 @@ export function App() {
         return;
       }
 
+      if (screen === 'start') {
+        return;
+      }
+
       if (e.key === 'Escape') {
         e.preventDefault();
         setIsPaused(prev => !prev);
@@ -665,28 +670,50 @@ export function App() {
       {/* CRT Scanline & Grain Overlay */}
       <div className="scanline-overlay pointer-events-none" />
 
-      {/* ACTIVE PLAYABLE FRONTPAGE HUD */}
-      <GameHUD
-        stats={stats}
-        difficulty={difficulty}
-        chaser={chaser}
-        mode={mode}
-        currentText={currentText}
-        typedText={typedText}
-        activeObstacle={activeObstacle}
-        settings={settings}
-        profile={profile}
-        isPaused={isPaused}
-        onPauseToggle={() => setIsPaused(prev => !prev)}
-        onKeystroke={handleKeystroke}
-        onBackspace={handleBackspace}
-        onSelectMode={selectedMode => startRun(selectedMode)}
-        onOpenLocker={() => setShowLocker(true)}
-        onOpenStats={() => setShowStats(true)}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenChallenges={() => setShowChallenges(true)}
-        onResetRun={() => startRun(mode)}
-      />
+      {/* FRONT PAGE: MODE SELECTION & PREVIEW SENTENCE */}
+      {screen === 'start' && (
+        <StartScreen
+          profile={profile}
+          settings={settings}
+          initialSentence={INITIAL_SENTENCE}
+          onStartGame={(chosenMode, chosenChaserId) => {
+            startRun(chosenMode, chosenChaserId);
+          }}
+          onOpenLocker={() => setShowLocker(true)}
+          onOpenStats={() => setShowStats(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenChallenges={() => setShowChallenges(true)}
+        />
+      )}
+
+      {/* ACTIVE PLAYABLE GAMEPLAY HUD */}
+      {(screen === 'playing' || screen === 'gameover') && (
+        <GameHUD
+          stats={stats}
+          difficulty={difficulty}
+          chaser={chaser}
+          mode={mode}
+          currentText={currentText}
+          typedText={typedText}
+          activeObstacle={activeObstacle}
+          settings={settings}
+          profile={profile}
+          isPaused={isPaused}
+          onPauseToggle={() => setIsPaused(prev => !prev)}
+          onKeystroke={handleKeystroke}
+          onBackspace={handleBackspace}
+          onSelectMode={selectedMode => startRun(selectedMode)}
+          onOpenLocker={() => setShowLocker(true)}
+          onOpenStats={() => setShowStats(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenChallenges={() => setShowChallenges(true)}
+          onResetRun={() => startRun(mode)}
+          onOpenModes={() => {
+            sound.stopMusic();
+            setScreen('start');
+          }}
+        />
+      )}
 
       {/* PAUSE MENU MODAL */}
       {isPaused && (
@@ -695,7 +722,8 @@ export function App() {
           onRestart={() => startRun(mode, chaser.id, activeChallenge || undefined)}
           onReturnHome={() => {
             setIsPaused(false);
-            startRun('endless');
+            sound.stopMusic();
+            setScreen('start');
           }}
         />
       )}
@@ -708,7 +736,10 @@ export function App() {
           isNewBest={isNewPersonalBest}
           onPlayAgain={() => startRun(mode, chaser.id, activeChallenge || undefined)}
           onPracticeSpeed={() => startRun('practice')}
-          onReturnHome={() => startRun('endless')}
+          onReturnHome={() => {
+            sound.stopMusic();
+            setScreen('start');
+          }}
         />
       )}
 

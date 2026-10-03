@@ -46,6 +46,7 @@ interface GameHUDProps {
   onOpenSettings: () => void;
   onOpenChallenges: () => void;
   onResetRun: () => void;
+  onOpenModes: () => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -67,7 +68,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onOpenStats,
   onOpenSettings,
   onOpenChallenges,
-  onResetRun
+  onResetRun,
+  onOpenModes
 }) => {
   const hiddenInputRef = useRef<HTMLInputElement>(null);
 
@@ -240,6 +242,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           {/* Tools & Utilities */}
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={onOpenModes}
+              className="p-1.5 sm:px-2.5 sm:py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 hover:text-white rounded-xl transition flex items-center gap-1.5 text-xs font-bold shadow-md"
+              title="Return to Mode Selection Screen"
+            >
+              <Compass className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Modes</span>
+            </button>
+
             <button
               onClick={onResetRun}
               className="p-1.5 sm:px-2.5 sm:py-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white rounded-xl transition flex items-center gap-1.5 text-xs font-bold shadow-md"
