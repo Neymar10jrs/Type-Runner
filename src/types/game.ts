@@ -179,6 +179,8 @@ export interface PlayerProfile {
   recentRuns: RunRecord[];
 }
 
+export type UserProfile = PlayerProfile;
+
 export interface RunRecord {
   id: string;
   timestamp: number;

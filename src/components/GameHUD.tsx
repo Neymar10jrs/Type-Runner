@@ -90,21 +90,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     return () => clearInterval(interval);
   }, [isPaused]);
 
-  // Handle keydown on input
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isPaused) return;
 
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      onBackspace();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      onPauseToggle();
-    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      e.preventDefault();
-      onKeystroke(e.key);
-    }
-  };
 
   // Format timer MM:SS
   const formatTime = (secs: number) => {
@@ -182,15 +168,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 select-none overflow-hidden"
       onClick={() => hiddenInputRef.current?.focus()}
     >
-      {/* Hidden input to capture physical keystrokes */}
+      {/* Hidden input to capture focus on touch / virtual keyboard devices */}
       <input
         ref={hiddenInputRef}
+        data-game-input="true"
         type="text"
         className="opacity-0 absolute -top-96 left-0 pointer-events-auto"
         autoFocus
         value=""
         onChange={() => {}}
-        onKeyDown={handleKeyDown}
+        tabIndex={-1}
+        aria-hidden="true"
       />
 
       {/* TOP BAR: GAME TITLE + QUICK MODES + PROFILE + TELEMETRY */}

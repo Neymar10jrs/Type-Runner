@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { GameMode, PlayerProfile, GameSettings } from '../types/game';
 import { CHASERS } from '../engine/chasers';
 import { TextGenerator } from '../engine/textGenerator';
+import { useShaderBackground } from '@/components/ui/animated-shader-hero';
 import {
   Play,
   Crosshair,
@@ -16,7 +17,8 @@ import {
   Award,
   Sparkles,
   Compass,
-  X
+  X,
+  User
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -28,6 +30,8 @@ interface StartScreenProps {
   onOpenStats: () => void;
   onOpenSettings: () => void;
   onOpenChallenges: () => void;
+  onOpenLogin?: () => void;
+  onOpenShaderHero?: () => void;
 }
 
 export const StartScreen: React.FC<StartScreenProps> = ({
@@ -38,8 +42,12 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   onOpenLocker,
   onOpenStats,
   onOpenSettings,
-  onOpenChallenges
+  onOpenChallenges,
+  onOpenLogin,
+  onOpenShaderHero
 }) => {
+  const [shaderBgEnabled, setShaderBgEnabled] = useState<boolean>(true);
+  const shaderCanvasRef = useShaderBackground();
   const [selectedMode, setSelectedMode] = useState<GameMode>('endless');
   const [selectedChaserId, setSelectedChaserId] = useState<string>('dragon');
   const [showBeastPicker, setShowBeastPicker] = useState<boolean>(false);
@@ -119,6 +127,15 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
   return (
     <div className="relative z-10 w-full min-h-screen flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto bg-black/45 backdrop-blur-[2px]">
+      {/* Animated WebGL Shader Background */}
+      {shaderBgEnabled && (
+        <canvas
+          ref={shaderCanvasRef}
+          className="fixed inset-0 w-full h-full object-cover pointer-events-none opacity-45 -z-10"
+          style={{ background: '#030712' }}
+        />
+      )}
+
       {/* HEADER BAR: PROFILE & TOOLS */}
       <header className="flex items-center justify-between w-full max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
@@ -145,6 +162,46 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             <span className="font-mono font-bold text-amber-300 text-base">{profile.coins}</span>
             <span className="text-[10px] uppercase text-slate-400 font-bold">Coins</span>
           </div>
+
+          {/* Runner Login / Identity Portal */}
+          {onOpenLogin && (
+            <button
+              onClick={onOpenLogin}
+              className="flex items-center gap-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 px-3 py-2 rounded-xl transition text-xs font-semibold text-cyan-300 hover:text-white shadow-md shadow-cyan-500/10 cursor-pointer"
+              title="Runner Login & Cloud Progress Sync"
+            >
+              <User className="w-4 h-4 text-cyan-400" />
+              <span className="hidden sm:inline">Portal</span>
+            </button>
+          )}
+
+          {/* Shader Hero Preview */}
+          {onOpenShaderHero && (
+            <button
+              onClick={onOpenShaderHero}
+              className="flex items-center gap-1.5 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 hover:border-amber-400 px-3 py-2 rounded-xl transition text-xs font-semibold text-amber-300 hover:text-white cursor-pointer"
+              title="View Animated Shader Hero Banner"
+            >
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span className="hidden md:inline">Shader Hero</span>
+            </button>
+          )}
+
+          {/* Shader Background Toggle */}
+          <button
+            onClick={() => setShaderBgEnabled(prev => !prev)}
+            className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-mono font-bold transition cursor-pointer hidden lg:flex items-center gap-1 ${
+              shaderBgEnabled
+                ? 'bg-purple-950/80 border-purple-500/50 text-purple-300'
+                : 'bg-slate-900 border-slate-800 text-slate-500'
+            }`}
+            title="Toggle Animated Shader Background"
+          >
+            <span>Shader:</span>
+            <span className={shaderBgEnabled ? 'text-cyan-400' : 'text-slate-500'}>
+              {shaderBgEnabled ? 'ON' : 'OFF'}
+            </span>
+          </button>
 
           <button
             onClick={onOpenLocker}

@@ -185,8 +185,8 @@ export class GameRenderer {
 
     // Parallax scrolling updates (convert m/s to pixels/s)
     const worldPxSpeed = runnerSpeed * 28;
-    this.bgOffsetFar = (this.bgOffsetFar + worldPxSpeed * 0.08 * dt) % w;
-    this.bgOffsetMid = (this.bgOffsetMid + worldPxSpeed * 0.3 * dt) % w;
+    this.bgOffsetFar += worldPxSpeed * 0.08 * dt;
+    this.bgOffsetMid += worldPxSpeed * 0.3 * dt;
     this.groundOffset = (this.groundOffset + worldPxSpeed * 1.0 * dt) % 80;
 
     // Save context for camera shake
@@ -275,7 +275,7 @@ export class GameRenderer {
     ctx.fill();
   }
 
-  // --- FAR BACKGROUND ---
+  // --- FAR BACKGROUND (Mountains / Cityscape) ---
   private renderFarBackground(ctx: CanvasRenderingContext2D, env: EnvironmentConfig, w: number, groundY: number) {
     ctx.save();
     ctx.fillStyle = env.mountainColor;
@@ -284,31 +284,43 @@ export class GameRenderer {
     const mountainPeakHeight = groundY * 0.55;
     const step = 90;
     const offset = this.bgOffsetFar;
+    const minI = Math.floor((offset - step) / step) - 1;
+    const maxI = Math.ceil((offset + w + step) / step) + 1;
 
-    ctx.moveTo(0, groundY);
-    for (let x = -step; x <= w + step * 2; x += step) {
-      const drawX = x - (offset % step);
-      const isPeak = Math.floor((x + offset) / step) % 2 === 0;
-      const y = isPeak ? mountainPeakHeight + Math.sin(x * 0.05) * 45 : groundY * 0.85;
+    // Start offscreen to the left at ground level
+    const firstX = minI * step - offset;
+    ctx.moveTo(firstX, groundY);
+
+    for (let i = minI; i <= maxI; i++) {
+      const drawX = i * step - offset;
+      const isPeak = Math.abs(i) % 2 === 0;
+      const variance = Math.sin(i * 1.618) * 35;
+      const y = isPeak ? mountainPeakHeight + variance : groundY * 0.85;
       ctx.lineTo(drawX, y);
     }
-    ctx.lineTo(w, groundY);
+
+    // Connect down on the right and seal polygon back to start
+    const lastX = maxI * step - offset;
+    ctx.lineTo(lastX, groundY);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
 
-  // --- MIDGROUND PARALLAX ---
+  // --- MIDGROUND PARALLAX (Trees / Ruins / Pillars) ---
   private renderMidground(ctx: CanvasRenderingContext2D, env: EnvironmentConfig, w: number, groundY: number) {
     ctx.save();
     ctx.fillStyle = env.midgroundColor;
 
     const offset = this.bgOffsetMid;
     const step = 140;
+    const minI = Math.floor((offset - step) / step) - 1;
+    const maxI = Math.ceil((offset + w + step) / step) + 1;
 
-    for (let x = -step; x <= w + step * 2; x += step) {
-      const drawX = x - (offset % step);
-      const seed = Math.sin(Math.floor((x + offset) / step) * 12.3);
+    for (let i = minI; i <= maxI; i++) {
+      const drawX = i * step - offset;
+      // Deterministic seed based purely on world index i
+      const seed = Math.sin(i * 12.3);
 
       if (seed > 0.2) {
         // Ancient Arch or Tall Tree

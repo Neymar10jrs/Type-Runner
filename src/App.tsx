@@ -27,6 +27,8 @@ import { CustomizationModal } from './components/CustomizationModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ChallengesModal } from './components/ChallengesModal';
 import { PauseModal } from './components/PauseModal';
+import Hero from '@/components/ui/animated-shader-hero';
+import ContactWithGlobe from '@/components/ui/contact-with-globe';
 import { Zap, AlertTriangle } from 'lucide-react';
 
 type AppScreen = 'start' | 'playing' | 'gameover';
@@ -53,6 +55,8 @@ export function App() {
   const [showStats, setShowStats] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showChallenges, setShowChallenges] = useState<boolean>(false);
+  const [showLogin, setShowLogin] = useState<boolean>(false);
+  const [showShaderHero, setShowShaderHero] = useState<boolean>(false);
 
   // Active Game Configuration
   const [mode, setMode] = useState<GameMode>('endless');
@@ -91,8 +95,10 @@ export function App() {
   const [isNewPersonalBest, setIsNewPersonalBest] = useState<boolean>(false);
 
   // Engine refs for high-frequency game loop
-  const statsRef = useRef(stats);
-  statsRef.current = stats;
+  const statsRef = useRef<TypingStats>(stats);
+  const lastHudUpdateRef = useRef<number>(0);
+  const difficultyRef = useRef<DifficultyLevel>('beginner');
+  const activeObstacleRef = useRef<Obstacle | null>(null);
 
   const playerStateRef = useRef<PlayerActionState>('running');
   const playerStateTimerRef = useRef<number>(0);
@@ -278,8 +284,14 @@ export function App() {
         obstaclesFailed: 0
       };
 
+      statsRef.current = initialStats;
+      difficultyRef.current = 'beginner';
+      activeObstacleRef.current = null;
+      lastHudUpdateRef.current = performance.now();
+
       setStats(initialStats);
       setDifficulty('beginner');
+      setActiveObstacle(null);
       setIsPaused(false);
       setScreen('playing');
       setCountdown(3);
@@ -317,6 +329,7 @@ export function App() {
         xpEarned: baseXP
       };
 
+      setStats({ ...currentStats });
       setLastRunRecord(record);
       setScreen('gameover');
 
@@ -468,7 +481,9 @@ export function App() {
         rendererRef.current?.addFloatingText(`+200 ${activeObs.actionWord}!`, 380, 240, '#38bdf8');
       }
 
-      setStats(curStats);
+      statsRef.current = curStats;
+      setStats({ ...curStats });
+      lastHudUpdateRef.current = performance.now();
     },
     [screen, isPaused, activeChallenge, chaser.id, settings, handleGameOver]
   );
@@ -478,6 +493,8 @@ export function App() {
       const nextTyped = typedTextRef.current.slice(0, -1);
       typedTextRef.current = nextTyped;
       setTypedText(nextTyped);
+      setStats({ ...statsRef.current });
+      lastHudUpdateRef.current = performance.now();
     }
   }, []);
 
@@ -486,14 +503,22 @@ export function App() {
    */
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // If modal is active, allow Esc to close modal
-      if (showLocker || showStats || showSettings || showChallenges) {
+      // Don't capture keys if typing in interactive forms or modals (e.g. Locker, Settings, Profile, Login)
+      if (showLocker || showStats || showSettings || showChallenges || showLogin || showShaderHero) {
         if (e.key === 'Escape') {
           setShowLocker(false);
           setShowStats(false);
           setShowSettings(false);
           setShowChallenges(false);
+          setShowLogin(false);
+          setShowShaderHero(false);
         }
+        return;
+      }
+
+      // Don't intercept if target is another non-game input element
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && target.getAttribute('data-game-input') !== 'true') {
         return;
       }
 
@@ -563,7 +588,7 @@ export function App() {
       lastTime = currentTime;
 
       const isPlaying = screen === 'playing' && !isPaused;
-      const curStats = { ...statsRef.current };
+      const curStats = statsRef.current;
 
       if (isPlaying) {
         if (countdownRef.current !== null) {
@@ -632,7 +657,10 @@ export function App() {
         // 1. Difficulty & Speed Physics
         const { speed, difficulty: currentDiff } = difficultyEngine.update(dt, curStats);
         runnerSpeedRef.current = speed;
-        setDifficulty(currentDiff);
+        if (difficultyRef.current !== currentDiff) {
+          difficultyRef.current = currentDiff;
+          setDifficulty(currentDiff);
+        }
 
         // 2. Compute WPM & Accuracy
         const elapsedMinutes = Math.max(0.05, curStats.survivalSeconds / 60);
@@ -745,14 +773,25 @@ export function App() {
           }
         }
 
-        setActiveObstacle(nearbyObs);
-
-        const lastObstacle = currentObstacles[currentObstacles.length - 1];
-        if (!lastObstacle || lastObstacle.x < 35) {
-          spawnObstacle(45);
+        if (activeObstacleRef.current?.id !== nearbyObs?.id) {
+          activeObstacleRef.current = nearbyObs;
+          setActiveObstacle(nearbyObs);
         }
 
-        setStats(curStats);
+        const lastObstacle = currentObstacles[currentObstacles.length - 1];
+        if (!lastObstacle) {
+          spawnObstacle(45);
+        } else if (lastObstacle.x < 30) {
+          spawnObstacle(Math.max(45, lastObstacle.x + 35));
+        }
+
+        // Throttle React state HUD flushes to ~10 Hz (every 100ms) for distance, time, and score counters
+        // Keeps Canvas rendering at 60 FPS without React reconciliation lag or GC pauses
+        const now = performance.now();
+        if (now - lastHudUpdateRef.current >= 100) {
+          lastHudUpdateRef.current = now;
+          setStats({ ...curStats });
+        }
       }
 
       // Render Canvas Frame
@@ -814,6 +853,8 @@ export function App() {
           onOpenStats={() => setShowStats(true)}
           onOpenSettings={() => setShowSettings(true)}
           onOpenChallenges={() => setShowChallenges(true)}
+          onOpenLogin={() => setShowLogin(true)}
+          onOpenShaderHero={() => setShowShaderHero(true)}
         />
       )}
 
@@ -908,6 +949,72 @@ export function App() {
           }}
           onClose={() => setShowChallenges(false)}
         />
+      )}
+
+      {/* RUNNER LOGIN & CLOUD SYNC PORTAL (CONTACT WITH GLOBE) */}
+      {showLogin && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-2 sm:p-6 animate-fadeIn">
+          <div className="relative w-full max-w-5xl rounded-3xl overflow-hidden border border-cyan-500/40 shadow-[0_0_50px_rgba(6,182,212,0.25)] bg-zinc-950 max-h-[92vh] overflow-y-auto">
+            <button
+              onClick={() => setShowLogin(false)}
+              className="absolute top-4 right-4 z-50 p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700 transition cursor-pointer"
+              title="Close Portal"
+            >
+              ✕
+            </button>
+            <ContactWithGlobe
+              isLoginMode={true}
+              profile={profile}
+              onLogin={async ({ username }) => {
+                const updated = await ApiClient.saveProfile({ username });
+                setProfile(updated);
+              }}
+              onLogout={() => {
+                ApiClient.saveProfile({ username: 'Runner-01' }).then(setProfile);
+              }}
+              onClose={() => setShowLogin(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ANIMATED SHADER HERO FULL BANNER VIEW */}
+      {showShaderHero && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black flex flex-col items-center justify-center animate-fadeIn">
+          <button
+            onClick={() => setShowShaderHero(false)}
+            className="fixed top-6 right-6 z-50 px-4 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-cyan-400 hover:text-white border border-cyan-500/40 transition font-mono font-bold text-xs cursor-pointer"
+          >
+            ✕ Close Hero View
+          </button>
+          <Hero
+            trustBadge={{
+              text: "Typing Runner • Adaptive High-Velocity Engine",
+              icons: ["⚡", "🔥", "✨"]
+            }}
+            headline={{
+              line1: "TYPE TO SURVIVE",
+              line2: "OUTRUN THE BEASTS"
+            }}
+            subtitle="Master high-velocity typing across volcanic badlands, frozen tundras, and ancient forests. Outrun alpha predators and cataclysms in real-time."
+            buttons={{
+              primary: {
+                text: "Start Playing Now",
+                onClick: () => {
+                  setShowShaderHero(false);
+                  startRun('endless');
+                }
+              },
+              secondary: {
+                text: "Open Runner Portal",
+                onClick: () => {
+                  setShowShaderHero(false);
+                  setShowLogin(true);
+                }
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* PRE-GAME 3-2-1 COUNTDOWN OVERLAY */}
