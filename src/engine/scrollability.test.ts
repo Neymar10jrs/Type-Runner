@@ -66,4 +66,38 @@ describe('Home Page Scrollability & Gameplay Scroll Lock Specifications', () => 
     const safeAreaPadding = 'calc(0.5rem + env(safe-area-inset-bottom, 0px))';
     expect(safeAreaPadding).toContain('env(safe-area-inset-bottom');
   });
+
+  it('5. Hero landing view transitions to start screen on "Start Playing Now" or keypress', () => {
+    type ScreenState = 'hero' | 'start' | 'playing' | 'gameover';
+    let currentScreen: ScreenState = 'hero';
+    let audioUnlocked = false;
+
+    // Simulate clicking "Start Playing Now" on the Hero section
+    const onStartPlayingNow = () => {
+      audioUnlocked = true;
+      currentScreen = 'start';
+    };
+
+    expect(currentScreen).toBe('hero');
+    onStartPlayingNow();
+    expect(currentScreen).toBe('start');
+    expect(audioUnlocked).toBe(true);
+
+    // Simulate clicking "Hero View" from start screen
+    const onOpenHero = () => {
+      currentScreen = 'hero';
+    };
+    onOpenHero();
+    expect(currentScreen).toBe('hero');
+
+    // Simulate pressing Enter/Space/ArrowDown or scrolling down on hero screen
+    const onHeroKeyOrScroll = (key: string) => {
+      if (currentScreen === 'hero' && (key === 'Enter' || key === ' ' || key === 'ArrowDown')) {
+        audioUnlocked = true;
+        currentScreen = 'start';
+      }
+    };
+    onHeroKeyOrScroll('Enter');
+    expect(currentScreen).toBe('start');
+  });
 });

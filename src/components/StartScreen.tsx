@@ -31,7 +31,7 @@ interface StartScreenProps {
   onOpenSettings: () => void;
   onOpenChallenges: () => void;
   onOpenLogin?: () => void;
-  onOpenShaderHero?: () => void;
+  onOpenHero?: () => void;
 }
 
 export const StartScreen: React.FC<StartScreenProps> = ({
@@ -44,7 +44,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   onOpenSettings,
   onOpenChallenges,
   onOpenLogin,
-  onOpenShaderHero
+  onOpenHero
 }) => {
   const [shaderBgEnabled, setShaderBgEnabled] = useState<boolean>(true);
   const shaderCanvasRef = useShaderBackground();
@@ -178,15 +178,15 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             </button>
           )}
 
-          {/* Shader Hero Preview */}
-          {onOpenShaderHero && (
+          {/* Return to Hero Section */}
+          {onOpenHero && (
             <button
-              onClick={onOpenShaderHero}
-              className="flex items-center gap-1.5 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-500/40 hover:border-amber-400 px-3 py-2 rounded-xl transition text-xs font-semibold text-amber-300 hover:text-white cursor-pointer"
-              title="View Animated Shader Hero Banner"
+              onClick={onOpenHero}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-950/70 to-orange-950/70 hover:from-amber-900/90 hover:to-orange-900/90 border border-amber-500/40 hover:border-amber-400 px-3 py-2 rounded-xl transition text-xs font-semibold text-amber-300 hover:text-white shadow-md shadow-amber-500/10 cursor-pointer"
+              title="Return to Hero Landing Banner"
             >
               <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className="hidden md:inline">Shader Hero</span>
+              <span className="hidden sm:inline">Hero View</span>
             </button>
           )}
 

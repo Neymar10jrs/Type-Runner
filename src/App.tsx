@@ -31,7 +31,7 @@ import Hero from '@/components/ui/animated-shader-hero';
 import ContactWithGlobe from '@/components/ui/contact-with-globe';
 import { Zap, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 
-type AppScreen = 'start' | 'playing' | 'gameover';
+type AppScreen = 'hero' | 'start' | 'playing' | 'gameover';
 
 const INITIAL_SENTENCE = 'The ancient forest was silent before the storm arrived.';
 
@@ -47,8 +47,8 @@ export function App() {
   const [apiOnline, setApiOnline] = useState<boolean>(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Screen & Modals
-  const [screen, setScreen] = useState<AppScreen>('start');
+  // Screen & Modals (defaults to 'hero' as the standard hero section)
+  const [screen, setScreen] = useState<AppScreen>('hero');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showLocker, setShowLocker] = useState<boolean>(false);
@@ -56,7 +56,6 @@ export function App() {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showChallenges, setShowChallenges] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
-  const [showShaderHero, setShowShaderHero] = useState<boolean>(false);
   // Audio unlock: browsers block AudioContext until the first user gesture
   const [audioUnlocked, setAudioUnlocked] = useState<boolean>(false);
 
@@ -589,14 +588,13 @@ export function App() {
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Don't capture keys if typing in interactive forms or modals (e.g. Locker, Settings, Profile, Login)
-      if (showLocker || showStats || showSettings || showChallenges || showLogin || showShaderHero) {
+      if (showLocker || showStats || showSettings || showChallenges || showLogin) {
         if (e.key === 'Escape') {
           setShowLocker(false);
           setShowStats(false);
           setShowSettings(false);
           setShowChallenges(false);
           setShowLogin(false);
-          setShowShaderHero(false);
         }
         return;
       }
@@ -604,6 +602,17 @@ export function App() {
       // Don't intercept if target is another non-game input element
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && target.getAttribute('data-game-input') !== 'true') {
+        return;
+      }
+
+      if (screen === 'hero') {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          sound.init();
+          sound.resume();
+          setAudioUnlocked(true);
+          setScreen('start');
+        }
         return;
       }
 
@@ -665,7 +674,6 @@ export function App() {
     showSettings,
     showChallenges,
     showLogin,
-    showShaderHero,
     settings,
     handleKeystroke,
     handleBackspace,
@@ -1009,6 +1017,62 @@ export function App() {
         }
       </button>
 
+      {/* ── STANDARD HERO SECTION (LANDING VIEW) ── */}
+      {screen === 'hero' && (
+        <div
+          onWheel={(e) => {
+            if (e.deltaY > 30) {
+              sound.init();
+              sound.resume();
+              setAudioUnlocked(true);
+              setScreen('start');
+            }
+          }}
+          className="relative z-10 w-full min-h-[100vh] min-h-[100dvh] flex flex-col justify-center select-none animate-fadeIn"
+        >
+          <Hero
+            trustBadge={{
+              text: "Typing Runner • Adaptive High-Velocity Engine",
+              icons: ["⚡", "🔥", "✨"]
+            }}
+            headline={{
+              line1: "TYPE FAST. RUN FASTER.",
+              line2: "OUTRUN THE APOCALYPSE."
+            }}
+            subtitle="The ultimate browser typing survival game. Real-time procedural canvas physics, adaptive rolling difficulty, dynamic synthwave acoustics, and mythic beasts."
+            buttons={{
+              primary: {
+                text: "Start Playing Now",
+                onClick: () => {
+                  sound.init();
+                  sound.resume();
+                  setAudioUnlocked(true);
+                  setScreen('start');
+                }
+              },
+              secondary: {
+                text: "Open Runner Portal",
+                onClick: () => setShowLogin(true)
+              }
+            }}
+          >
+            <div
+              onClick={() => {
+                sound.init();
+                sound.resume();
+                setAudioUnlocked(true);
+                setScreen('start');
+              }}
+              className="mt-8 flex flex-col items-center gap-1 cursor-pointer opacity-75 hover:opacity-100 transition animate-bounce text-xs font-mono text-orange-200"
+              title="Click or scroll down to open game modes"
+            >
+              <span>Explore Game Modes & Challenges</span>
+              <span className="text-base text-yellow-400">↓</span>
+            </div>
+          </Hero>
+        </div>
+      )}
+
       {/* FRONT PAGE: MODE SELECTION & PREVIEW SENTENCE */}
       {screen === 'start' && (
         <StartScreen
@@ -1023,7 +1087,7 @@ export function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenChallenges={() => setShowChallenges(true)}
           onOpenLogin={() => setShowLogin(true)}
-          onOpenShaderHero={() => setShowShaderHero(true)}
+          onOpenHero={() => setScreen('hero')}
         />
       )}
 
@@ -1147,44 +1211,6 @@ export function App() {
         </div>
       )}
 
-      {/* ANIMATED SHADER HERO FULL BANNER VIEW */}
-      {showShaderHero && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black flex flex-col items-center justify-center animate-fadeIn">
-          <button
-            onClick={() => setShowShaderHero(false)}
-            className="fixed top-6 right-6 z-50 px-4 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-cyan-400 hover:text-white border border-cyan-500/40 transition font-mono font-bold text-xs cursor-pointer"
-          >
-            ✕ Close Hero View
-          </button>
-          <Hero
-            trustBadge={{
-              text: "Typing Runner • Adaptive High-Velocity Engine",
-              icons: ["⚡", "🔥", "✨"]
-            }}
-            headline={{
-              line1: "TYPE TO SURVIVE",
-              line2: "OUTRUN THE BEASTS"
-            }}
-            subtitle="Master high-velocity typing across volcanic badlands, frozen tundras, and ancient forests. Outrun alpha predators and cataclysms in real-time."
-            buttons={{
-              primary: {
-                text: "Start Playing Now",
-                onClick: () => {
-                  setShowShaderHero(false);
-                  startRun('endless');
-                }
-              },
-              secondary: {
-                text: "Open Runner Portal",
-                onClick: () => {
-                  setShowShaderHero(false);
-                  setShowLogin(true);
-                }
-              }
-            }}
-          />
-        </div>
-      )}
 
       {/* PRE-GAME 3-2-1 COUNTDOWN OVERLAY */}
       {countdown !== null && (
