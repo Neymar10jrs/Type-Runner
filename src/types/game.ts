@@ -104,6 +104,8 @@ export interface TypingStats {
   totalKeystrokes: number;
   correctKeystrokes: number;
   mistakes: number;
+  /** Mistakes not corrected by backspace — used for Flawless Flight */
+  uncorrectedErrors: number;
   wordsCompleted: number;
   currentStreak: number;
   bestStreak: number;
@@ -209,6 +211,12 @@ export interface GameSettings {
   dyslexiaFont: boolean;
   highContrast: boolean;
   reducedMotion: boolean;
+  /** Replace strobing lightning with a slow fade. WCAG 2.3.1: ≤3 flashes/sec */
+  reducedFlashing: boolean;
+  /** Add underline/strikethrough/icon cues so correct/wrong is never color-only */
+  colorblindMode: boolean;
+  /** Persist mute state across sessions */
+  muteAudio: boolean;
   screenShake: boolean;
 }
 

@@ -29,7 +29,7 @@ import { ChallengesModal } from './components/ChallengesModal';
 import { PauseModal } from './components/PauseModal';
 import Hero from '@/components/ui/animated-shader-hero';
 import ContactWithGlobe from '@/components/ui/contact-with-globe';
-import { Zap, AlertTriangle } from 'lucide-react';
+import { Zap, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 
 type AppScreen = 'start' | 'playing' | 'gameover';
 
@@ -57,6 +57,8 @@ export function App() {
   const [showChallenges, setShowChallenges] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showShaderHero, setShowShaderHero] = useState<boolean>(false);
+  // Audio unlock: browsers block AudioContext until the first user gesture
+  const [audioUnlocked, setAudioUnlocked] = useState<boolean>(false);
 
   // Active Game Configuration
   const [mode, setMode] = useState<GameMode>('endless');
@@ -78,6 +80,7 @@ export function App() {
     totalKeystrokes: 0,
     correctKeystrokes: 0,
     mistakes: 0,
+    uncorrectedErrors: 0,
     wordsCompleted: 0,
     currentStreak: 0,
     bestStreak: 0,
@@ -125,10 +128,32 @@ export function App() {
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('resize', handleResize);
+
+    // Listen for devicePixelRatio / zoom changes dynamically
+    let dprMedia: MediaQueryList | null = null;
+    const attachDprListener = () => {
+      if (dprMedia) {
+        dprMedia.removeEventListener('change', handleResize);
+      }
+      dprMedia = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      dprMedia.addEventListener('change', () => {
+        handleResize();
+        attachDprListener();
+      }, { once: true });
+    };
+    attachDprListener();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      if (dprMedia) {
+        dprMedia.removeEventListener('change', handleResize);
+      }
+    };
   }, []);
 
-  // Sync settings with sound engine on mount
+  // Sync settings with sound engine on mount and whenever settings change
   useEffect(() => {
     sound.setVolumes(
       settings.masterVolume,
@@ -137,6 +162,10 @@ export function App() {
       settings.ambientVolume
     );
     sound.setKeyboardType(settings.keyboardSoundType);
+    // Apply persisted mute state
+    sound.setMuted(settings.muteAudio ?? false);
+    // Attach auto-resume listeners once (safe to call multiple times)
+    sound.resumeOnInteraction();
   }, [settings]);
 
   // Sync profile and settings with backend server on mount
@@ -156,6 +185,34 @@ export function App() {
 
     return () => unsubscribe();
   }, []);
+
+  const isRunActive = screen === 'playing' && !isPaused;
+
+  // Lock scroll only while active gameplay is running (screen === 'playing' && !isPaused)
+  // Restore scroll when returning to start screen, pausing, or game over
+  useEffect(() => {
+    if (isRunActive) {
+      window.scrollTo(0, 0);
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [isRunActive]);
+
+  // Smooth scrolling is enabled by default, but disabled if reducedMotion is active
+  useEffect(() => {
+    document.documentElement.style.scrollBehavior = settings.reducedMotion ? 'auto' : 'smooth';
+    return () => {
+      document.documentElement.style.scrollBehavior = '';
+    };
+  }, [settings.reducedMotion]);
 
   // Pre-game countdown tick effect (3 -> 2 -> 1 -> RUN! -> null)
   useEffect(() => {
@@ -272,6 +329,7 @@ export function App() {
         totalKeystrokes: 0,
         correctKeystrokes: 0,
         mistakes: 0,
+        uncorrectedErrors: 0,
         wordsCompleted: 0,
         currentStreak: 0,
         bestStreak: 0,
@@ -289,13 +347,16 @@ export function App() {
       activeObstacleRef.current = null;
       lastHudUpdateRef.current = performance.now();
 
+      window.scrollTo(0, 0);
       setStats(initialStats);
       setDifficulty('beginner');
       setActiveObstacle(null);
       setIsPaused(false);
       setScreen('playing');
       setCountdown(3);
+      setAudioUnlocked(true); // user gestured by clicking a mode — AudioContext can now start
       sound.playBlip();
+
     },
     [spawnObstacle]
   );
@@ -447,6 +508,9 @@ export function App() {
       } else {
         // --- MISTAKE ---
         curStats.mistakes += 1;
+        // An uncorrected error is one that hasn't been fixed yet.
+        // We increment here; handleBackspace will decrement it if the player corrects it.
+        curStats.uncorrectedErrors = (curStats.uncorrectedErrors ?? 0) + 1;
         curStats.currentStreak = 0;
         curStats.comboMultiplier = 1.0;
 
@@ -458,7 +522,10 @@ export function App() {
         }
         rendererRef.current?.addFloatingText('MISS', 380, 290, '#ef4444');
 
-        // Immediate failure for Zero-Mistake challenges
+        // Flawless Flight: only fail on UNCORRECTED errors, not the total mistakes count.
+        // The player must get to uncorrectedErrors > 0 at end of passage; we check it here
+        // per-keystroke to give immediate feedback but only fail if they don't correct it
+        // (challenge logic already handles the game-over path correctly via zeroMistakesAllowed).
         if (activeChallenge?.zeroMistakesAllowed) {
           rendererRef.current?.addFloatingText('FLAWLESS TRIAL FAILED', 400, 200, '#ef4444');
           handleGameOver(false);
@@ -490,13 +557,31 @@ export function App() {
 
   const handleBackspace = useCallback(() => {
     if (typedTextRef.current.length > 0) {
-      const nextTyped = typedTextRef.current.slice(0, -1);
+      const curText = currentTextRef.current;
+      const curTyped = typedTextRef.current;
+      // Check whether the character being erased was wrong (to decrement uncorrectedErrors)
+      const erasedIndex = curTyped.length - 1;
+      const wasWrong = curTyped[erasedIndex] !== curText[erasedIndex];
+
+      const nextTyped = curTyped.slice(0, -1);
       typedTextRef.current = nextTyped;
       setTypedText(nextTyped);
+
+      // If the erased char was a mistake, it's now corrected → decrement uncorrectedErrors
+      if (wasWrong) {
+        const cur = statsRef.current;
+        statsRef.current = {
+          ...cur,
+          uncorrectedErrors: Math.max(0, (cur.uncorrectedErrors ?? 1) - 1)
+        };
+        difficultyEngine.registerBackspace();
+      }
+
       setStats({ ...statsRef.current });
       lastHudUpdateRef.current = performance.now();
     }
   }, []);
+
 
   /**
    * GLOBAL KEYDOWN LISTENER: Guarantees typing works immediately anywhere on the page
@@ -552,11 +637,22 @@ export function App() {
         return;
       }
 
+      // M key → toggle mute
+      if (e.key === 'm' || e.key === 'M') {
+        const newMuted = !(settings.muteAudio ?? false);
+        const updated = { ...settings, muteAudio: newMuted };
+        sound.setMuted(newMuted);
+        setSettings(updated);
+        StorageManager.saveSettings(updated);
+        return;
+      }
+
       // Printable single character
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleKeystroke(e.key);
       }
+
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -568,6 +664,9 @@ export function App() {
     showStats,
     showSettings,
     showChallenges,
+    showLogin,
+    showShaderHero,
+    settings,
     handleKeystroke,
     handleBackspace,
     startRun,
@@ -605,7 +704,8 @@ export function App() {
               profile.equippedTrail,
               curStats.currentStreak,
               settings.reducedMotion,
-              mode
+              mode,
+              settings.reducedFlashing
             );
           }
           animationFrameId = requestAnimationFrame(loop);
@@ -808,7 +908,8 @@ export function App() {
           profile.equippedTrail,
           curStats.currentStreak,
           settings.reducedMotion,
-          mode
+          mode,
+          settings.reducedFlashing
         );
       }
 
@@ -827,18 +928,86 @@ export function App() {
     profile.equippedSkin,
     profile.equippedTrail,
     settings.reducedMotion,
+    settings.reducedFlashing,
     settings.screenShake,
     spawnObstacle,
     handleGameOver
   ]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-black select-none">
-      {/* Background HTML5 Canvas */}
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block z-0" />
+    <div
+      className={`relative w-full bg-black select-none overflow-x-hidden ${
+        isRunActive
+          ? 'fixed inset-0 h-[100vh] h-[100dvh] overflow-hidden'
+          : 'min-h-[100vh] min-h-[100dvh]'
+      }`}
+    >
+      {/* Background HTML5 Canvas: fixed so it stays centered behind scrolling home screen */}
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 w-full h-full block z-0 pointer-events-none"
+      />
 
       {/* CRT Scanline & Grain Overlay */}
-      <div className="scanline-overlay pointer-events-none" />
+      <div className="scanline-overlay pointer-events-none fixed inset-0" />
+
+      {/* ── AUDIO UNLOCK SCREEN: shown on start page before any user gesture ── */}
+      {screen === 'start' && !audioUnlocked && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Audio unlock prompt"
+        >
+          <div className="text-center px-8 py-6 rounded-3xl bg-slate-950/90 border border-cyan-500/40 shadow-2xl max-w-sm mx-4">
+            <div className="text-4xl mb-3" aria-hidden="true">🎧</div>
+            <h2 className="text-xl font-black text-white font-heading tracking-wider mb-2">
+              CLICK TO ENABLE AUDIO
+            </h2>
+            <p className="text-sm text-slate-400 font-mono mb-5">
+              Click, tap, or press any key to unlock music & sound effects.<br />
+              (Browsers require a user gesture before audio can play.)
+            </p>
+            <button
+              onClick={() => {
+                sound.init();
+                sound.resume();
+                setAudioUnlocked(true);
+              }}
+              className="px-8 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black font-heading tracking-widest text-sm shadow-lg shadow-cyan-500/40 transition focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none"
+              autoFocus
+            >
+              ▶ START WITH SOUND
+            </button>
+            <button
+              onClick={() => setAudioUnlocked(true)}
+              className="block mt-3 mx-auto text-xs text-slate-500 hover:text-slate-300 underline transition"
+            >
+              Continue without sound
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── PERSISTENT MUTE TOGGLE (top-right corner, always visible) ── */}
+      <button
+        onClick={() => {
+          const newMuted = !(settings.muteAudio ?? false);
+          const updated = { ...settings, muteAudio: newMuted };
+          sound.setMuted(newMuted);
+          setSettings(updated);
+          StorageManager.saveSettings(updated);
+        }}
+        aria-label={settings.muteAudio ? 'Unmute audio' : 'Mute audio'}
+        aria-pressed={settings.muteAudio ?? false}
+        className="fixed top-3 right-3 z-[55] p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 text-slate-300 hover:text-white transition shadow-md backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+        title={settings.muteAudio ? 'Unmute (M)' : 'Mute (M)'}
+      >
+        {settings.muteAudio
+          ? <VolumeX className="w-4 h-4 text-red-400" aria-hidden="true" />
+          : <Volume2 className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+        }
+      </button>
 
       {/* FRONT PAGE: MODE SELECTION & PREVIEW SENTENCE */}
       {screen === 'start' && (

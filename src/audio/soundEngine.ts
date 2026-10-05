@@ -60,8 +60,47 @@ class SoundEngine {
 
   public resume() {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
+  }
+
+  /** Returns true once the AudioContext has been created and is not closed */
+  public isReady(): boolean {
+    return !!this.ctx && this.ctx.state !== 'closed';
+  }
+
+  /** Mute/unmute all output and persist to the master gain */
+  public setMuted(muted: boolean) {
+    this.isMuted = muted;
+    if (this.ctx && this.masterGain) {
+      const target = muted ? 0 : this.masterVol;
+      this.masterGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  public getMuted(): boolean {
+    return this.isMuted;
+  }
+
+  /**
+   * Attach one-shot listeners so AudioContext auto-resumes after being
+   * suspended by the browser (tab-switch, mobile background).
+   * Safe to call multiple times — only attaches once.
+   */
+  private interactionListenerAttached = false;
+  public resumeOnInteraction() {
+    if (this.interactionListenerAttached) return;
+    this.interactionListenerAttached = true;
+    const handler = () => {
+      if (this.ctx?.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    };
+    window.addEventListener('pointerdown', handler, { passive: true });
+    window.addEventListener('keydown', handler, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) handler();
+    });
   }
 
   public setVolumes(master: number, sfx: number, music: number, ambient: number) {

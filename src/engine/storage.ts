@@ -209,6 +209,10 @@ export const DEFAULT_PROFILE: PlayerProfile = {
   recentRuns: []
 };
 
+// Detect OS accessibility preferences at import time (runs once)
+const prefersReducedMotion = typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
 export const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 0.8,
   musicVolume: 0.5,
@@ -218,7 +222,10 @@ export const DEFAULT_SETTINGS: GameSettings = {
   fontSize: 'large',
   dyslexiaFont: false,
   highContrast: false,
-  reducedMotion: false,
+  reducedMotion: prefersReducedMotion,
+  reducedFlashing: prefersReducedMotion, // default ON if OS requests it
+  colorblindMode: false,
+  muteAudio: false,
   screenShake: true
 };
 

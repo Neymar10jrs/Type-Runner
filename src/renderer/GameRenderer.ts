@@ -56,9 +56,10 @@ export class GameRenderer {
   private shakeDecay: number = 5.0;
   private cameraZoom: number = 1.0;
 
-  // Lightning flash state
+  // Lightning flash state (WCAG 2.3.1 compliant: <= 3 flashes/sec, slow fade in reducedFlashing mode)
   private lightningTimer: number = 0;
-  private lightningActive: boolean = false;
+  private lightningFlashAlpha: number = 0;
+  private lightningCooldown: number = 0;
 
   // Cinematic events
   private cinematicEventTimer: number = 0;
@@ -78,11 +79,13 @@ export class GameRenderer {
   public resize() {
     const rect = this.canvas.getBoundingClientRect();
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = rect.width || 1200;
-    this.height = rect.height || 700;
+    this.width = rect.width || window.innerWidth || 1200;
+    this.height = rect.height || window.innerHeight || 700;
 
-    this.canvas.width = this.width * this.dpr;
-    this.canvas.height = this.height * this.dpr;
+    this.canvas.width = Math.round(this.width * this.dpr);
+    this.canvas.height = Math.round(this.height * this.dpr);
+    // Explicitly reset the matrix before applying new DPR scale to prevent matrix accumulation on resize
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(this.dpr, this.dpr);
   }
 
@@ -154,7 +157,8 @@ export class GameRenderer {
     equippedTrailId: string,
     streak: number,
     reducedMotion: boolean = false,
-    mode: GameMode = 'endless'
+    mode: GameMode = 'endless',
+    reducedFlashing: boolean = false
   ) {
     const ctx = this.ctx;
     const w = this.width;
@@ -184,10 +188,12 @@ export class GameRenderer {
     }
 
     // Parallax scrolling updates (convert m/s to pixels/s)
+    // When reducedMotion is enabled, heavy parallax speed is significantly dampened
     const worldPxSpeed = runnerSpeed * 28;
-    this.bgOffsetFar += worldPxSpeed * 0.08 * dt;
-    this.bgOffsetMid += worldPxSpeed * 0.3 * dt;
-    this.groundOffset = (this.groundOffset + worldPxSpeed * 1.0 * dt) % 80;
+    const parallaxFactor = reducedMotion ? 0.2 : 1.0;
+    this.bgOffsetFar += worldPxSpeed * 0.08 * dt * parallaxFactor;
+    this.bgOffsetMid += worldPxSpeed * 0.3 * dt * parallaxFactor;
+    this.groundOffset = (this.groundOffset + worldPxSpeed * 1.0 * dt * parallaxFactor) % 80;
 
     // Save context for camera shake
     ctx.save();
@@ -210,7 +216,10 @@ export class GameRenderer {
     this.renderMidground(ctx, env, w, groundY);
 
     // 5. WEATHER PARTICLES (Back layer)
-    this.updateAndRenderWeather(ctx, env, dt, runnerSpeed, w, h);
+    this.updateAndRenderWeather(ctx, env, dt, runnerSpeed, w, h, reducedMotion);
+
+    // 5b. LIGHTNING FLASHES (WCAG 2.3.1 compliant: <= 3 flashes/sec, gentle slow fade in reducedFlashing mode)
+    this.updateAndRenderLightning(ctx, env, dt, reducedFlashing, w, h);
 
     // 6. GROUND & ROAD
     this.renderGround(ctx, env, w, h, groundY);
@@ -230,7 +239,7 @@ export class GameRenderer {
     // 9. RUNNING TRAILS & PARTICLES
     const skin = SKINS_CATALOG.find(s => s.id === equippedSkinId) || SKINS_CATALOG[0];
     const trail = TRAILS_CATALOG.find(t => t.id === equippedTrailId) || TRAILS_CATALOG[0];
-    this.updateAndRenderTrails(ctx, trail, runnerScreenX, groundY, playerState, runnerSpeed, dt);
+    this.updateAndRenderTrails(ctx, trail, runnerScreenX, groundY, playerState, runnerSpeed, dt, reducedMotion);
 
     // 10. RUNNER CHARACTER
     this.renderRunner(ctx, skin, playerState, runnerScreenX, groundY, runnerSpeed);
@@ -245,11 +254,12 @@ export class GameRenderer {
 
     // 13. DANGER VIGNETTE (if chaser < 30m, disabled in practice mode)
     if (mode !== 'practice' && chaserDistanceMeters < 30) {
-      this.renderDangerVignette(ctx, chaserDistanceMeters, w, h);
+      this.renderDangerVignette(ctx, chaserDistanceMeters, w, h, reducedFlashing);
     }
 
     ctx.restore();
   }
+
 
   // --- CELESTIAL / SKY FX ---
   private renderCelestial(ctx: CanvasRenderingContext2D, env: EnvironmentConfig, w: number, groundY: number) {
@@ -384,13 +394,20 @@ export class GameRenderer {
     dt: number,
     runnerSpeed: number,
     w: number,
-    h: number
+    h: number,
+    reducedMotion: boolean = false
   ) {
     ctx.save();
-    for (const p of this.weatherParticles) {
+    // In reducedMotion mode, render a sparse particle subset moving gently
+    const particleSubset = reducedMotion
+      ? this.weatherParticles.slice(0, Math.min(20, this.weatherParticles.length))
+      : this.weatherParticles;
+
+    for (const p of particleSubset) {
       // Wind speed offset
-      p.x += (p.vx - runnerSpeed * 0.4) * dt * 45;
-      p.y += p.vy * dt * 45;
+      const speedMult = reducedMotion ? 0.25 : 1.0;
+      p.x += (p.vx - runnerSpeed * 0.4 * speedMult) * dt * 45;
+      p.y += p.vy * dt * 45 * speedMult;
 
       if (p.x < -20) p.x = w + 20;
       if (p.x > w + 20) p.x = -20;
@@ -410,6 +427,41 @@ export class GameRenderer {
     ctx.restore();
   }
 
+  // --- LIGHTNING FLASHES (WCAG 2.3.1: <= 3 flashes/second) ---
+  private updateAndRenderLightning(
+    ctx: CanvasRenderingContext2D,
+    env: EnvironmentConfig,
+    dt: number,
+    reducedFlashing: boolean,
+    w: number,
+    h: number
+  ) {
+    if (env.particleType !== 'lightning') return;
+
+    this.lightningTimer += dt;
+    this.lightningCooldown = Math.max(0, this.lightningCooldown - dt);
+
+    // WCAG 2.3.1: Flash frequency capped to at most 1 flash per 4 seconds (strictly <= 3 per sec)
+    if (this.lightningTimer > 8.0 && this.lightningCooldown <= 0) {
+      this.lightningTimer = 0;
+      this.lightningCooldown = 4.0;
+      // In reducedFlashing mode, maximum alpha is a gentle 0.12 ambient glow
+      this.lightningFlashAlpha = reducedFlashing ? 0.12 : 0.35;
+    }
+
+    if (this.lightningFlashAlpha > 0) {
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = this.lightningFlashAlpha;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+
+      // Fade out slowly (gentle fade over 1.2s if reducedFlashing, otherwise 0.25s)
+      const fadeRate = reducedFlashing ? 0.1 : 1.4;
+      this.lightningFlashAlpha = Math.max(0, this.lightningFlashAlpha - fadeRate * dt);
+    }
+  }
+
   // --- RUNNING TRAILS ---
   private updateAndRenderTrails(
     ctx: CanvasRenderingContext2D,
@@ -418,11 +470,12 @@ export class GameRenderer {
     groundY: number,
     state: PlayerActionState,
     speed: number,
-    dt: number
+    dt: number,
+    reducedMotion: boolean = false
   ) {
     // Spawn new trail particles at runner heels if running/sprinting
     if (state === 'running' || state === 'sprint') {
-      const spawnCount = state === 'sprint' ? 3 : 1;
+      const spawnCount = reducedMotion ? 1 : state === 'sprint' ? 3 : 1;
       for (let i = 0; i < spawnCount; i++) {
         this.trailParticles.push({
           x: runnerX - 10 + (Math.random() * 8 - 4),
@@ -1199,8 +1252,11 @@ export class GameRenderer {
   }
 
   // --- DANGER VIGNETTE ---
-  private renderDangerVignette(ctx: CanvasRenderingContext2D, distance: number, w: number, h: number) {
-    const intensity = Math.max(0, Math.min(0.65, (30 - distance) / 25));
+  private renderDangerVignette(ctx: CanvasRenderingContext2D, distance: number, w: number, h: number, reducedFlashing: boolean = false) {
+    const rawIntensity = (30 - distance) / 25;
+    // When reducedFlashing is active, cap intensity to gentle 0.35 to avoid high-contrast jarring transitions
+    const maxIntensity = reducedFlashing ? 0.35 : 0.65;
+    const intensity = Math.max(0, Math.min(maxIntensity, rawIntensity));
     ctx.save();
     const grad = ctx.createRadialGradient(w / 2, h / 2, w * 0.35, w / 2, h / 2, w * 0.7);
     grad.addColorStop(0, 'transparent');

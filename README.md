@@ -58,6 +58,43 @@ On every new run, the encounter engine randomly selects from 12 distinct threats
 
 ---
 
+## 📖 How to Play
+
+1. **Choose a Game Mode**: Select from Endless Run, Creature Hunt, Disaster Run, Time Attack, Practice Mode, or Challenge Gauntlets on the main menu.
+2. **Type the Target Sentence**: Type the characters displayed in the translucent glass console. Each correct keystroke accelerates your runner and builds your combo streak.
+3. **Hurdle Obstacles**: When approaching fallen trees, rock spikes, or fire pits, maintain your streak or hurdle with typing bursts to leap or slide past hazards cleanly.
+4. **Outrun the Pursuer**: Maintain distance from alpha predators and cataclysms. Pauses or typos cause momentum loss, allowing the threat to close in.
+5. **Keyboard Shortcuts**:
+   * `ESC`: Pause / Resume run
+   * `M`: Toggle audio mute (persists across sessions)
+   * `Enter` / `Space` (Game Over screen): Instant retry
+
+---
+
+## ♿ Accessibility & Mobile
+
+TYPING RUNNER is built from the ground up to be accessible, customizable, and mobile-friendly:
+
+### 📱 Mobile & Virtual Keyboard Handling
+* **Visual Viewport Synchronization**: Listens to `window.visualViewport` resize and scroll events so on-screen keyboards never cover the running action or the active sentence box.
+* **Mobile-Optimized Input**: Hidden input utilizes `autocapitalize="off"`, `autocorrect="off"`, `autocomplete="off"`, and `spellcheck={false}`. Uses `beforeinput` and `input` events so mobile predictive text cannot corrupt gameplay.
+* **Tap-to-Focus**: Tapping anywhere on the typing interface or game canvas automatically opens and focuses the soft keyboard.
+* **Responsive Layout**: Fluidly scales across standard mobile screen dimensions (360×640, 390×844, and landscape orientations).
+
+### 👁️ Accessibility Settings (Settings Modal)
+* **Re-enabled Zoom**: Replaced restrictive meta tags with `width=device-width, initial-scale=1.0, viewport-fit=cover`. The HTML5 Canvas adapts dynamically to window resize and `devicePixelRatio` zoom changes.
+* **Audio Gesture Unlock**: AudioContext starts upon user interaction via an unlock screen or mode click, and automatically resumes after tab switching or backgrounding.
+* **Persistent Mute Toggle**: Dedicated mute button in the top-right header and `M` shortcut that saves across browser sessions.
+* **Reduced Motion**: Automatically defaults to ON if `prefers-reduced-motion: reduce` is detected in the operating system. Disables camera shake, dampens heavy parallax scrolling by 80%, and reduces weather particle counts.
+* **Reduced Flashing (WCAG 2.3.1)**: Replaces lightning flashes and strobe hazards with a gentle, slow ambient fade. Strobe frequency is strictly capped below 3 flashes per second.
+* **Colorblind-Friendly Mode**: Typing accuracy feedback never relies on color alone—correct characters receive an underline, while mistakes display a strikethrough and a `×` indicator. High-contrast color palette supports deuteranopia and protanopia.
+* **Fair Difficulty & Flawless Flight**:
+  * Mistakes trigger a 1.5-second grace period during which subsequent penalties are dampened, preventing compound failure loops.
+  * Single typos count only once in the 15-second rolling window.
+  * In the **Flawless Flight** challenge, errors are clearly defined as *uncorrected errors*—fixing a typo with backspace leaves the flawless record intact. Live HUD indicator shows remaining uncorrected errors.
+
+---
+
 ## 🎵 Procedural Web Audio API Sound Synthesizer
 
 100% self-contained procedural audio with zero external asset downloads:

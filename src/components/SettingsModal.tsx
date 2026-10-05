@@ -7,10 +7,8 @@ import {
   X,
   Volume2,
   Type,
-  Eye,
   Sliders,
   Keyboard,
-  ShieldCheck,
   Check
 } from 'lucide-react';
 
@@ -250,9 +248,67 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <input
                 type="checkbox"
+                id="setting-screenshake"
                 checked={settings.screenShake}
                 onChange={e => handleChange('screenShake', e.target.checked)}
                 className="w-5 h-5 accent-cyan-400 rounded cursor-pointer"
+                aria-label="Toggle impact screen shake"
+              />
+            </div>
+
+            {/* Reduced Flashing */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
+              <div>
+                <div className="text-xs font-semibold text-slate-200">
+                  Reduced Flashing
+                  <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded-full">WCAG 2.3.1</span>
+                </div>
+                <div className="text-[10px] text-slate-500">Replaces strobing lightning with slow fades (≤3 flashes/sec)</div>
+              </div>
+              <input
+                type="checkbox"
+                id="setting-reducedflashing"
+                checked={settings.reducedFlashing ?? false}
+                onChange={e => handleChange('reducedFlashing', e.target.checked)}
+                className="w-5 h-5 accent-amber-400 rounded cursor-pointer"
+                aria-label="Toggle reduced flashing (WCAG 2.3.1)"
+              />
+            </div>
+
+            {/* Colorblind Mode */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
+              <div>
+                <div className="text-xs font-semibold text-slate-200">
+                  Colorblind-Friendly Mode
+                  <span className="ml-1.5 text-[9px] uppercase tracking-wide text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded-full">Deuteranopia / Protanopia</span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Adds underline (correct) and strikethrough + × icon (wrong) so feedback is never color-only
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                id="setting-colorblind"
+                checked={settings.colorblindMode ?? false}
+                onChange={e => handleChange('colorblindMode', e.target.checked)}
+                className="w-5 h-5 accent-emerald-400 rounded cursor-pointer"
+                aria-label="Toggle colorblind-friendly typing cues"
+              />
+            </div>
+
+            {/* Mute All Audio */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
+              <div>
+                <div className="text-xs font-semibold text-slate-200">Mute All Audio</div>
+                <div className="text-[10px] text-slate-500">Silences music, SFX, and ambience — persists across sessions</div>
+              </div>
+              <input
+                type="checkbox"
+                id="setting-mute"
+                checked={settings.muteAudio ?? false}
+                onChange={e => handleChange('muteAudio', e.target.checked)}
+                className="w-5 h-5 accent-red-400 rounded cursor-pointer"
+                aria-label="Toggle mute all audio"
               />
             </div>
           </div>

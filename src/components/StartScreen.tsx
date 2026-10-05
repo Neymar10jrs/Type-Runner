@@ -126,7 +126,10 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   };
 
   return (
-    <div className="relative z-10 w-full min-h-screen flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto bg-black/45 backdrop-blur-[2px]">
+    <div
+      className="relative z-10 w-full min-h-[100vh] min-h-[100dvh] flex flex-col justify-between p-4 sm:p-8 select-none bg-black/45 backdrop-blur-[2px] overflow-x-hidden"
+      style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+    >
       {/* Animated WebGL Shader Background */}
       {shaderBgEnabled && (
         <canvas
@@ -137,7 +140,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       )}
 
       {/* HEADER BAR: PROFILE & TOOLS */}
-      <header className="flex items-center justify-between w-full max-w-6xl mx-auto">
+      <header className="flex flex-wrap items-center justify-between gap-3 w-full max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-400 flex items-center justify-center font-bold text-lg shadow-lg shadow-cyan-500/30">
             {profile.level}
@@ -436,13 +439,47 @@ export const StartScreen: React.FC<StartScreenProps> = ({
       </main>
 
       {/* FOOTER */}
-      <footer className="w-full max-w-6xl mx-auto flex items-center justify-between text-xs text-slate-400 font-mono border-t border-slate-900 pt-3">
+      <footer className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 font-mono border-t border-slate-900 pt-3">
         <span>TYPING RUNNER v1.0 • Adaptive Survival</span>
         <span>
           Best WPM: <strong className="text-amber-400">{profile.bestWpm}</strong> • High Score:{' '}
           <strong className="text-purple-400">{profile.bestScore.toLocaleString()}</strong>
         </span>
       </footer>
+
+      {/* STICKY QUICK-START ACTION BAR: lets players start run from anywhere without scrolling back up */}
+      <aside
+        aria-label="Quick launch bar"
+        className="sticky bottom-0 z-40 w-full max-w-6xl mx-auto pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] mt-4 bg-gradient-to-t from-black via-black/90 to-transparent pointer-events-auto"
+      >
+        <div className="flex items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/40 backdrop-blur-md shadow-2xl">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="p-2 sm:p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 shrink-0">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[11px] sm:text-xs uppercase font-bold text-slate-300 truncate">
+                Selected Mode: <strong className="text-cyan-300 font-mono">{selectedMode.replace('_', ' ').toUpperCase()}</strong>
+                {(selectedMode === 'creature_hunt' || selectedMode === 'disaster_run') && (
+                  <span className="text-slate-400"> • {currentChaser.name}</span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-400 truncate hidden xs:block">
+                Ready to sprint • Press Enter or click to run
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onStartGame(selectedMode, selectedChaserId)}
+            className="px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs sm:text-sm tracking-wider flex items-center gap-2 shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none"
+            aria-label={`Start run in ${selectedMode.replace('_', ' ')} mode`}
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>PLAY NOW</span>
+          </button>
+        </div>
+      </aside>
 
       {/* MYTHICAL BEAST SELECTION MODAL */}
       {showBeastPicker && (
